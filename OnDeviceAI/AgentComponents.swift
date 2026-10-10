@@ -60,6 +60,50 @@ struct ModelCardView: View {
     let onSwitch: () -> Void
 
     var body: some View {
+        Group {
+            if selectedMode == 0 {
+                OnDeviceModelInfoView()
+            } else {
+                CustomModelSelectionView(onSwitch: onSwitch)
+            }
+        }
+        .padding(12)
+        .background(AppColors.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(AppColors.border, lineWidth: 1))
+    }
+}
+
+private struct OnDeviceModelInfoView: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 11)
+                .fill(AppColors.surfaceInset)
+                .frame(width: 36, height: 36)
+                .overlay {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(AppColors.blue)
+                }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Apple Intelligence")
+                    .font(.system(size: 16, weight: .semibold))
+                    .tracking(-0.3)
+                    .foregroundStyle(AppColors.ink)
+                Text("Uses on-device models. Write your prompt below to get started.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(AppColors.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct CustomModelSelectionView: View {
+    let onSwitch: () -> Void
+
+    var body: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 11)
                 .fill(AppColors.surfaceInset)
@@ -72,7 +116,7 @@ struct ModelCardView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 7) {
-                    Text(selectedMode == 0 ? "Claude 3.5 Sonnet" : "GPT-4o")
+                    Text("GPT-4o")
                         .font(.system(size: 17, weight: .semibold))
                         .tracking(-0.35)
                         .foregroundStyle(AppColors.ink)
@@ -100,9 +144,6 @@ struct ModelCardView: View {
                 .foregroundStyle(AppColors.blue)
             }
         }
-        .padding(12)
-        .background(AppColors.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(AppColors.border, lineWidth: 1))
     }
 }
 
