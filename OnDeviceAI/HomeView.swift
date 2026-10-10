@@ -1,26 +1,26 @@
 import SwiftUI
 
-struct Home: View {
+struct HomeView: View {
     @State private var viewModel = HomeViewModel()
 
     private var promptBinding: Binding<String> {
         Binding(
-            get: { viewModel.homeUI.uiModel.prompt },
+            get: { viewModel.uiModel.prompt },
             set: { viewModel.updatePrompt($0) }
         )
     }
 
     private var modeBinding: Binding<Int> {
         Binding(
-            get: { viewModel.homeUI.uiModel.selectedMode },
+            get: { viewModel.uiModel.selectedMode },
             set: { viewModel.selectMode($0) }
         )
     }
 
     private var modelPickerBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.homeUI.isModelPickerPresented },
-            set: { viewModel.homeUI.isModelPickerPresented = $0 }
+            get: { viewModel.isModelPickerPresented },
+            set: { viewModel.isModelPickerPresented = $0 }
         )
     }
 
@@ -32,18 +32,18 @@ struct Home: View {
                 VStack(spacing: 16) {
                     AgentModePicker(selection: modeBinding)
                     ModelCardView(
-                        selectedMode: viewModel.homeUI.uiModel.selectedMode,
-                        modelName: viewModel.homeUI.uiModel.customModelName
+                        selectedMode: viewModel.uiModel.selectedMode,
+                        modelName: viewModel.uiModel.customModelName
                     ) {
-                        viewModel.homeUI.isModelPickerPresented = true
+                        viewModel.isModelPickerPresented = true
                     }
                     PromptCardView(prompt: promptBinding)
                     RunAgentButton(isRunning: isExecuting) {
                         viewModel.toggleExecutionState()
                     }
                     CompletedResultCard(
-                        viewState: viewModel.homeUI.viewState,
-                        model: viewModel.homeUI.uiModel
+                        viewState: viewModel.viewState,
+                        model: viewModel.uiModel
                     )
                 }
                 .padding(.horizontal, 16)
@@ -62,11 +62,11 @@ struct Home: View {
     }
 
     private var isExecuting: Bool {
-        if case .executing = viewModel.homeUI.viewState { return true }
+        if case .executing = viewModel.viewState { return true }
         return false
     }
 }
 
 #Preview {
-    Home()
+    HomeView()
 }

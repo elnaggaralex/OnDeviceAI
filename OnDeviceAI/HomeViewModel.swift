@@ -1,37 +1,20 @@
 import Foundation
 import Observation
+import FoundationModels
 
 @MainActor
 @Observable
 final class HomeViewModel {
-    struct HomeUI {
-        enum ViewState {
-            case executing
-            case executed(UIModel)
-            case failed
-        }
+    private var homeUI = HomeUI()
 
-        struct UIModel {
-            var prompt = "Analyze recent quarterly growth metrics for clean energy startups and synthesize an executive summary infographic."
-            var selectedMode = 0
-            var modelName = "Apple Intelligence"
-            var customModelName = "GPT-4o"
-            var completionDuration = "1.4s"
-            var responseImageName = "GeneratedInfographic"
-        }
-
-        var viewState: ViewState
-        var uiModel: UIModel
-        var isModelPickerPresented = false
-
-        init() {
-            let model = UIModel()
-            uiModel = model
-            viewState = .executed(model)
-        }
+    var viewState: ViewState { homeUI.viewState }
+    var uiModel: UIModel { homeUI.uiModel }
+    
+    
+    var isModelPickerPresented: Bool {
+        get { homeUI.isModelPickerPresented }
+        set { homeUI.isModelPickerPresented = newValue }
     }
-
-    var homeUI = HomeUI()
 
     func updatePrompt(_ prompt: String) {
         homeUI.uiModel.prompt = prompt
@@ -69,6 +52,35 @@ final class HomeViewModel {
     private func refreshExecutedStateIfNeeded() {
         if case .executed = homeUI.viewState {
             homeUI.viewState = .executed(homeUI.uiModel)
+        }
+    }
+}
+
+enum ViewState {
+    case executing
+    case executed(UIModel)
+    case failed
+}
+
+struct UIModel {
+    var prompt = "Analyze recent quarterly growth metrics for clean energy startups and synthesize an executive summary infographic."
+    var selectedMode = 0
+    var modelName = "Apple Intelligence"
+    var customModelName = "GPT-4o"
+    var completionDuration = "1.4s"
+    var responseImageName = "GeneratedInfographic"
+}
+
+private extension HomeViewModel {
+    struct HomeUI {
+        var viewState: ViewState
+        var uiModel: UIModel
+        var isModelPickerPresented = false
+
+        init() {
+            let model = UIModel()
+            uiModel = model
+            viewState = .executed(model)
         }
     }
 }
