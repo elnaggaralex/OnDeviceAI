@@ -20,4 +20,5 @@ enum AppColors {
     static let infographicViolet = Color(red: 0.55, green: 0.26, blue: 0.93)
     static let infographicInk = Color(red: 0.13, green: 0.25, blue: 0.40)
     static let success = Color(red: 0.18, green: 0.75, blue: 0.39)
+    static let error = Color(red: 0.80, green: 0.20, blue: 0.24)
 }
