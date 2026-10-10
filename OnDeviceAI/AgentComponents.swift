@@ -57,6 +57,7 @@ struct AgentModePicker: View {
 
 struct ModelCardView: View {
     let selectedMode: Int
+    let modelName: String
     let onSwitch: () -> Void
 
     var body: some View {
@@ -64,7 +65,7 @@ struct ModelCardView: View {
             if selectedMode == 0 {
                 OnDeviceModelInfoView()
             } else {
-                CustomModelSelectionView(onSwitch: onSwitch)
+                CustomModelSelectionView(modelName: modelName, onSwitch: onSwitch)
             }
         }
         .padding(12)
@@ -101,6 +102,7 @@ private struct OnDeviceModelInfoView: View {
 }
 
 private struct CustomModelSelectionView: View {
+    let modelName: String
     let onSwitch: () -> Void
 
     var body: some View {
@@ -116,7 +118,7 @@ private struct CustomModelSelectionView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 7) {
-                    Text("GPT-4o")
+                    Text(modelName)
                         .font(.system(size: 17, weight: .semibold))
                         .tracking(-0.35)
                         .foregroundStyle(AppColors.ink)
@@ -219,11 +221,12 @@ private struct SeparatorView: View {
 }
 
 struct RunAgentButton: View {
-    @Binding var isRunning: Bool
+    let isRunning: Bool
+    let action: () -> Void
 
     var body: some View {
         Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { isRunning.toggle() }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75), action)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: isRunning ? "sparkles" : "play.fill")
@@ -254,12 +257,13 @@ struct RunAgentButton: View {
 }
 
 struct CompletedResultCard: View {
-    let isRunning: Bool
+    let viewState: HomeViewModel.HomeUI.ViewState
+    let model: HomeViewModel.HomeUI.UIModel
 
     var body: some View {
         VStack(spacing: 0) {
-            CompletedStatusHeader(isRunning: isRunning)
-            ModelResponseView()
+            CompletedStatusHeader(viewState: viewState, model: model)
+            ModelResponseView(imageName: model.responseImageName)
         }
         .background(AppColors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -272,13 +276,14 @@ struct CompletedResultCard: View {
 }
 
 struct CompletedStatusHeader: View {
-    let isRunning: Bool
+    let viewState: HomeViewModel.HomeUI.ViewState
+    let model: HomeViewModel.HomeUI.UIModel
 
     var body: some View {
         HStack(spacing: 8) {
             HStack(spacing: 5) {
-                Circle().fill(AppColors.success).frame(width: 7, height: 7)
-                Text(isRunning ? "Running • 0.2s" : "Completed • 1.4s")
+                Circle().fill(statusColor).frame(width: 7, height: 7)
+                Text(statusText)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(AppColors.ink)
             }
@@ -286,7 +291,7 @@ struct CompletedStatusHeader: View {
             .padding(.vertical, 5)
             .background(AppColors.surfacePill, in: Capsule())
 
-            Text("Claude 3.5")
+            Text(modelName)
                 .font(.system(size: 13))
                 .foregroundStyle(AppColors.muted)
             Spacer()
@@ -304,9 +309,36 @@ struct CompletedStatusHeader: View {
             .fill(AppColors.surfaceMuted)
         }
     }
+
+    private var statusText: String {
+        switch viewState {
+        case .executing:
+            return "Running • 0.2s"
+        case .executed(let result):
+            return "Completed • \(result.completionDuration)"
+        case .failed:
+            return "Failed"
+        }
+    }
+
+    private var modelName: String {
+        switch viewState {
+        case .executed(let result): return result.modelName
+        case .executing, .failed: return model.modelName
+        }
+    }
+
+    private var statusColor: Color {
+        switch viewState {
+        case .executing, .executed: return AppColors.success
+        case .failed: return AppColors.error
+        }
+    }
 }
 
 struct ModelResponseView: View {
+    let imageName: String
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
@@ -322,15 +354,17 @@ struct ModelResponseView: View {
             .padding(.horizontal, 16)
             .overlay(alignment: .bottom) { Color.black.opacity(0.05).frame(height: 1) }
 
-            InfographicPreview()
+            InfographicPreview(imageName: imageName)
                 .padding(16)
         }
     }
 }
 
 struct InfographicPreview: View {
+    let imageName: String
+
     var body: some View {
-        Image("GeneratedInfographic")
+        Image(imageName)
             .resizable()
             .aspectRatio(contentMode: .fill)
             .frame(maxWidth: .infinity)
