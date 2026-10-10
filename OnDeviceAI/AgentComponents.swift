@@ -257,8 +257,8 @@ struct RunAgentButton: View {
 }
 
 struct CompletedResultCard: View {
-    let viewState: HomeViewModel.HomeUI.ViewState
-    let model: HomeViewModel.HomeUI.UIModel
+    let viewState: ViewState
+    let model: UIModel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -276,8 +276,8 @@ struct CompletedResultCard: View {
 }
 
 struct CompletedStatusHeader: View {
-    let viewState: HomeViewModel.HomeUI.ViewState
-    let model: HomeViewModel.HomeUI.UIModel
+    let viewState: ViewState
+    let model: UIModel
 
     var body: some View {
         HStack(spacing: 8) {
