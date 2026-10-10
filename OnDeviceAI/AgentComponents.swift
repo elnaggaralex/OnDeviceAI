@@ -255,28 +255,11 @@ struct RunAgentButton: View {
 
 struct CompletedResultCard: View {
     let isRunning: Bool
-    @Binding var selection: Int
 
     var body: some View {
         VStack(spacing: 0) {
             CompletedStatusHeader(isRunning: isRunning)
-
-            HStack(spacing: 0) {
-                ResultTab(title: "Generated Visual", icon: "photo", index: 0, selection: $selection)
-                ResultTab(title: "Text Summary", icon: "text.alignleft", index: 1, selection: $selection)
-            }
-            .frame(height: 44)
-            .padding(.horizontal, 16)
-            .overlay(alignment: .bottom) { Color.black.opacity(0.05).frame(height: 1) }
-
-            Group {
-                if selection == 0 {
-                    InfographicPreview()
-                } else {
-                    TextSummaryView()
-                }
-            }
-            .padding(16)
+            ModelResponseView()
         }
         .background(AppColors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -323,31 +306,25 @@ struct CompletedStatusHeader: View {
     }
 }
 
-struct ResultTab: View {
-    let title: String
-    let icon: String
-    let index: Int
-    @Binding var selection: Int
-
+struct ModelResponseView: View {
     var body: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.18)) { selection = index }
-        } label: {
-            VStack(spacing: 7) {
-                HStack(spacing: 7) {
-                    Image(systemName: icon).font(.system(size: 13, weight: .medium))
-                    Text(title)
-                        .font(.system(size: 13, weight: index == selection ? .semibold : .medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                .foregroundStyle(index == selection ? AppColors.blue : AppColors.muted)
-                Capsule().fill(index == selection ? AppColors.blue : .clear).frame(height: 2)
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "text.bubble")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(AppColors.blue)
+                Text("Model Response")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppColors.blue)
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
+            .frame(height: 44)
+            .padding(.horizontal, 16)
+            .overlay(alignment: .bottom) { Color.black.opacity(0.05).frame(height: 1) }
+
+            InfographicPreview()
+                .padding(16)
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -359,42 +336,5 @@ struct InfographicPreview: View {
             .frame(maxWidth: .infinity)
             .aspectRatio(1.67, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 13))
-    }
-}
-
-struct TextSummaryView: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Clean energy startups are accelerating")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(AppColors.ink)
-            Text("Quarterly revenue grew steadily through 2024, while funding and user adoption continued to expand across key markets.")
-                .font(.system(size: 13))
-                .foregroundStyle(AppColors.muted)
-                .lineSpacing(4)
-            HStack(spacing: 8) {
-                SummaryMetricView(value: "45.0M", label: "Q4 revenue")
-                SummaryMetricView(value: "+32%", label: "YoY growth")
-                SummaryMetricView(value: "18", label: "Markets")
-            }
-            .padding(.top, 4)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 10)
-    }
-}
-
-private struct SummaryMetricView: View {
-    let value: String
-    let label: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(value).font(.system(size: 14, weight: .semibold)).foregroundStyle(AppColors.blue)
-            Text(label).font(.system(size: 10)).foregroundStyle(AppColors.muted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(9)
-        .background(AppColors.page, in: RoundedRectangle(cornerRadius: 10))
     }
 }
