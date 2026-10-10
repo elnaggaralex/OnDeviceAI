@@ -1,0 +1,6 @@
+# Xcode per-user workspace state
+**/xcuserdata/
+
+# Build products
+DerivedData/
+build/

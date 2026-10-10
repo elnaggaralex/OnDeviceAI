@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "generated-infographic.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
