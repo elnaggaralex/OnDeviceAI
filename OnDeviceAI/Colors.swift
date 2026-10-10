@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum AppColors {
+enum Colors {
     static let page = Color(red: 0.976, green: 0.973, blue: 0.990)
     static let surface = Color.white
     static let surfaceMuted = Color(red: 0.95, green: 0.945, blue: 0.965)

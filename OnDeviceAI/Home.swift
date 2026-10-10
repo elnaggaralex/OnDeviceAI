@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ContentView: View {
+struct Home: View {
     @State private var viewModel = HomeViewModel()
 
     private var promptBinding: Binding<String> {
@@ -51,7 +51,7 @@ struct ContentView: View {
                 .padding(.bottom, 24)
             }
         }
-        .background(AppColors.page.ignoresSafeArea())
+        .background(Colors.page.ignoresSafeArea())
         .preferredColorScheme(.light)
         .confirmationDialog("Choose a model", isPresented: modelPickerBinding, titleVisibility: .visible) {
             Button("Claude 3.5 Sonnet") { viewModel.selectCustomModel("Claude 3.5 Sonnet") }
@@ -68,5 +68,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    Home()
 }

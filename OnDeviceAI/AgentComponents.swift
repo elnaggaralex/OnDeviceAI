@@ -6,8 +6,8 @@ struct AgentHeaderView: View {
             Text("On-Device AI")
                 .font(.system(size: 21, weight: .semibold, design: .rounded))
                 .tracking(-0.55)
-                .foregroundStyle(AppColors.ink)
-            Circle().fill(AppColors.purple.opacity(0.72)).frame(width: 15, height: 15)
+                .foregroundStyle(Colors.ink)
+            Circle().fill(Colors.purple.opacity(0.72)).frame(width: 15, height: 15)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 12)
@@ -25,7 +25,7 @@ struct AgentModePicker: View {
             modeButton(title: "Custom Model", icon: "cpu", index: 1)
         }
         .padding(4)
-        .background(AppColors.selectorTrack, in: Capsule())
+        .background(Colors.selectorTrack, in: Capsule())
         .frame(height: 40)
     }
 
@@ -36,17 +36,17 @@ struct AgentModePicker: View {
             HStack(spacing: 7) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(index == selection ? AppColors.purple : AppColors.control)
+                    .foregroundStyle(index == selection ? Colors.purple : Colors.control)
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .foregroundStyle(index == selection ? AppColors.ink : AppColors.control)
+            .foregroundStyle(index == selection ? Colors.ink : Colors.control)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
                 if index == selection {
-                    Capsule().fill(AppColors.surface).shadow(color: .black.opacity(0.08), radius: 3, y: 1)
+                    Capsule().fill(Colors.surface).shadow(color: .black.opacity(0.08), radius: 3, y: 1)
                 }
             }
             .contentShape(Capsule())
@@ -69,8 +69,8 @@ struct ModelCardView: View {
             }
         }
         .padding(12)
-        .background(AppColors.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(AppColors.border, lineWidth: 1))
+        .background(Colors.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Colors.border, lineWidth: 1))
     }
 }
 
@@ -78,22 +78,22 @@ private struct OnDeviceModelInfoView: View {
     var body: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 11)
-                .fill(AppColors.surfaceInset)
+                .fill(Colors.surfaceInset)
                 .frame(width: 36, height: 36)
                 .overlay {
                     Image(systemName: "brain.head.profile")
                         .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(AppColors.blue)
+                        .foregroundStyle(Colors.blue)
                 }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("Apple Intelligence")
                     .font(.system(size: 16, weight: .semibold))
                     .tracking(-0.3)
-                    .foregroundStyle(AppColors.ink)
+                    .foregroundStyle(Colors.ink)
                 Text("Uses on-device models. Write your prompt below to get started.")
                     .font(.system(size: 12))
-                    .foregroundStyle(AppColors.muted)
+                    .foregroundStyle(Colors.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -108,12 +108,12 @@ private struct CustomModelSelectionView: View {
     var body: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 11)
-                .fill(AppColors.surfaceInset)
+                .fill(Colors.surfaceInset)
                 .frame(width: 36, height: 36)
                 .overlay {
                     Image(systemName: "brain.head.profile")
                         .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(AppColors.blue)
+                        .foregroundStyle(Colors.blue)
                 }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -121,19 +121,19 @@ private struct CustomModelSelectionView: View {
                     Text(modelName)
                         .font(.system(size: 17, weight: .semibold))
                         .tracking(-0.35)
-                        .foregroundStyle(AppColors.ink)
+                        .foregroundStyle(Colors.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Text("v2")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(AppColors.muted)
+                        .foregroundStyle(Colors.muted)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
-                        .background(AppColors.surfaceInset, in: RoundedRectangle(cornerRadius: 5))
+                        .background(Colors.surfaceInset, in: RoundedRectangle(cornerRadius: 5))
                 }
                 Text("Context: 200k • Fast Multi-step\nReasoning")
                     .font(.system(size: 12))
-                    .foregroundStyle(AppColors.muted)
+                    .foregroundStyle(Colors.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -143,7 +143,7 @@ private struct CustomModelSelectionView: View {
                     Text("Switch").font(.system(size: 13, weight: .medium))
                     Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold))
                 }
-                .foregroundStyle(AppColors.blue)
+                .foregroundStyle(Colors.blue)
             }
         }
     }
@@ -157,24 +157,24 @@ struct PromptCardView: View {
             HStack {
                 Image(systemName: "brain.head.profile")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(AppColors.purple)
+                    .foregroundStyle(Colors.purple)
                 Text("PROMPT")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(AppColors.label)
+                    .foregroundStyle(Colors.label)
                 Spacer()
                 Text("\(prompt.count) chars")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(AppColors.muted)
+                    .foregroundStyle(Colors.muted)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
-                    .background(AppColors.surfaceInset, in: Capsule())
+                    .background(Colors.surfaceInset, in: Capsule())
             }
 
             SeparatorView()
 
             TextField("Write a prompt…", text: $prompt, axis: .vertical)
                 .font(.system(size: 15))
-                .foregroundStyle(AppColors.ink)
+                .foregroundStyle(Colors.ink)
                 .lineSpacing(5)
                 .lineLimit(3...5)
                 .textFieldStyle(.plain)
@@ -186,37 +186,37 @@ struct PromptCardView: View {
                 Button {} label: {
                     Image(systemName: "mic")
                         .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(AppColors.control)
+                        .foregroundStyle(Colors.control)
                         .frame(width: 28, height: 28)
                 }
                 Button {} label: {
                     Image(systemName: "paperclip")
                         .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(AppColors.control)
+                        .foregroundStyle(Colors.control)
                         .frame(width: 28, height: 28)
                 }
                 Spacer()
                 Button("Clear") { prompt = "" }
                     .font(.system(size: 12))
-                    .foregroundStyle(AppColors.muted)
+                    .foregroundStyle(Colors.muted)
                     .padding(.trailing, 4)
                 Text("\(max(1, (prompt.count + 4) / 5)) Tokens")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(AppColors.control)
+                    .foregroundStyle(Colors.control)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
-                    .background(AppColors.surfacePill, in: Capsule())
+                    .background(Colors.surfacePill, in: Capsule())
             }
         }
         .padding(16)
-        .background(AppColors.surface, in: RoundedRectangle(cornerRadius: 21))
-        .overlay(RoundedRectangle(cornerRadius: 21).stroke(AppColors.border, lineWidth: 1))
+        .background(Colors.surface, in: RoundedRectangle(cornerRadius: 21))
+        .overlay(RoundedRectangle(cornerRadius: 21).stroke(Colors.border, lineWidth: 1))
     }
 }
 
 private struct SeparatorView: View {
     var body: some View {
-        AppColors.separator.frame(height: 0.7)
+        Colors.separator.frame(height: 0.7)
     }
 }
 
@@ -242,14 +242,14 @@ struct RunAgentButton: View {
             .frame(height: 60)
             .background {
                 LinearGradient(
-                    colors: [AppColors.buttonBlue, AppColors.purple, AppColors.blue],
+                    colors: [Colors.buttonBlue, Colors.purple, Colors.blue],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             }
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.35), lineWidth: 1))
-            .shadow(color: AppColors.blue.opacity(0.22), radius: 12, y: 5)
+            .shadow(color: Colors.blue.opacity(0.22), radius: 12, y: 5)
         }
         .buttonStyle(.plain)
         .padding(.top, 4)
@@ -265,11 +265,11 @@ struct CompletedResultCard: View {
             CompletedStatusHeader(viewState: viewState, model: model)
             ModelResponseView(imageName: model.responseImageName)
         }
-        .background(AppColors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Colors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(AppColors.border, lineWidth: 1)
+                .strokeBorder(Colors.border, lineWidth: 1)
         }
         .padding(.top, 4)
     }
@@ -285,15 +285,15 @@ struct CompletedStatusHeader: View {
                 Circle().fill(statusColor).frame(width: 7, height: 7)
                 Text(statusText)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(AppColors.ink)
+                    .foregroundStyle(Colors.ink)
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
-            .background(AppColors.surfacePill, in: Capsule())
+            .background(Colors.surfacePill, in: Capsule())
 
             Text(modelName)
                 .font(.system(size: 13))
-                .foregroundStyle(AppColors.muted)
+                .foregroundStyle(Colors.muted)
             Spacer()
         }
         .padding(.horizontal, 14)
@@ -306,7 +306,7 @@ struct CompletedStatusHeader: View {
                 bottomTrailingRadius: 0,
                 topTrailingRadius: 20
             )
-            .fill(AppColors.surfaceMuted)
+            .fill(Colors.surfaceMuted)
         }
     }
 
@@ -330,8 +330,8 @@ struct CompletedStatusHeader: View {
 
     private var statusColor: Color {
         switch viewState {
-        case .executing, .executed: return AppColors.success
-        case .failed: return AppColors.error
+        case .executing, .executed: return Colors.success
+        case .failed: return Colors.error
         }
     }
 }
@@ -344,10 +344,10 @@ struct ModelResponseView: View {
             HStack(spacing: 8) {
                 Image(systemName: "text.bubble")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(AppColors.blue)
+                    .foregroundStyle(Colors.blue)
                 Text("Model Response")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(AppColors.blue)
+                    .foregroundStyle(Colors.blue)
                 Spacer()
             }
             .frame(height: 44)
