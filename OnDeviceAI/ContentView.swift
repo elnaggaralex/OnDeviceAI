@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selectedMode = 0
-    @State private var selectedResult = 0
     @State private var prompt = "Analyze recent quarterly growth metrics for clean energy startups and synthesize an executive summary infographic."
     @State private var isRunning = false
     @State private var showingModelPicker = false
@@ -19,7 +18,7 @@ struct ContentView: View {
                     }
                     PromptCardView(prompt: $prompt)
                     RunAgentButton(isRunning: $isRunning)
-                    CompletedResultCard(isRunning: isRunning, selection: $selectedResult)
+                    CompletedResultCard(isRunning: isRunning)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
