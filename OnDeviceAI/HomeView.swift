@@ -53,11 +53,13 @@ struct HomeView: View {
         }
         .background(Colors.page.ignoresSafeArea())
         .preferredColorScheme(.light)
-        .confirmationDialog("Choose a model", isPresented: modelPickerBinding, titleVisibility: .visible) {
-            Button("Claude 3.5 Sonnet") { viewModel.selectCustomModel("Claude 3.5 Sonnet") }
-            Button("GPT-4o") { viewModel.selectCustomModel("GPT-4o") }
-            Button("Gemini 2.5 Pro") { viewModel.selectCustomModel("Gemini 2.5 Pro") }
-            Button("Cancel", role: .cancel) { }
+        .sheet(isPresented: modelPickerBinding) {
+            ModelPickerSheet(selectedModel: viewModel.uiModel.customModelName) { model in
+                viewModel.selectCustomModel(model)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(32)
         }
     }
 
