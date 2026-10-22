@@ -6,10 +6,19 @@ import FoundationModels
 @Observable
 final class HomeViewModel {
     private var homeUI = HomeUI()
+    var isAppleIntelligenceEnableAlertPresented = false
 
     var viewState: ViewState { homeUI.viewState }
     var uiModel: UIModel { homeUI.uiModel }
     
+    private var session = LanguageModelSession()
+    
+
+    func checkAppleIntelligenceAvailability() {
+        if case .unavailable(.appleIntelligenceNotEnabled) = SystemLanguageModel.default.availability {
+            isAppleIntelligenceEnableAlertPresented = true
+        }
+    }
     
     var isModelPickerPresented: Bool {
         get { homeUI.isModelPickerPresented }
@@ -25,6 +34,7 @@ final class HomeViewModel {
         homeUI.uiModel.selectedMode = mode
         homeUI.uiModel.modelName = mode == 0 ? "Apple Intelligence" : homeUI.uiModel.customModelName
         refreshExecutedStateIfNeeded()
+        
     }
 
     func selectCustomModel(_ modelName: String) {

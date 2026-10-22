@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @State private var viewModel = HomeViewModel()
+    @Environment(\.openURL) private var openURL
 
     private var promptBinding: Binding<String> {
         Binding(
@@ -53,6 +54,19 @@ struct HomeView: View {
         }
         .background(Colors.page.ignoresSafeArea())
         .preferredColorScheme(.light)
+        .task {
+            viewModel.checkAppleIntelligenceAvailability()
+        }
+        .alert("Enable Apple Intelligence", isPresented: $viewModel.isAppleIntelligenceEnableAlertPresented) {
+            Button("OK") {
+                if let settingsURL = URL(string: "App-prefs:APPLE_INTELLIGENCE") {
+                    openURL(settingsURL)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Apple Intelligence is available on this device but is turned off. You can enable it in Settings to use the on-device model.")
+        }
         .sheet(isPresented: modelPickerBinding) {
             ModelPickerSheet(selectedModel: viewModel.uiModel.customModelName) { model in
                 viewModel.selectCustomModel(model)
