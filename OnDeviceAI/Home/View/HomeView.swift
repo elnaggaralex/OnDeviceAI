@@ -42,9 +42,11 @@ struct HomeView: View {
                     RunAgentButton(isRunning: isExecuting) {
                         viewModel.toggleExecutionState()
                     }
+                    .disabled(!isExecuting && viewModel.uiModel.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     CompletedResultCard(
                         viewState: viewModel.viewState,
-                        model: viewModel.uiModel
+                        model: viewModel.uiModel,
+                        elapsedTime: viewModel.elapsedTime
                     )
                 }
                 .padding(.horizontal, 16)

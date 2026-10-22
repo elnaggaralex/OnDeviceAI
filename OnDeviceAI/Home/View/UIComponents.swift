@@ -20,38 +20,15 @@ struct AgentModePicker: View {
     @Binding var selection: Int
 
     var body: some View {
-        HStack(spacing: 4) {
-            modeButton(title: "Apple Intelligence", icon: "sparkles", index: 0)
-            modeButton(title: "Custom Model", icon: "cpu", index: 1)
+        Picker("Model type", selection: $selection) {
+            Label("Apple Intelligence", systemImage: "sparkles")
+                .tag(0)
+            Label("Custom Model", systemImage: "cpu")
+                .tag(1)
         }
-        .padding(4)
-        .background(Colors.selectorTrack, in: Capsule())
+        .pickerStyle(.segmented)
+        .tint(Colors.purple)
         .frame(height: 40)
-    }
-
-    private func modeButton(title: String, icon: String, index: Int) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { selection = index }
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(index == selection ? Colors.purple : Colors.control)
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(index == selection ? Colors.ink : Colors.control)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background {
-                if index == selection {
-                    Capsule().fill(Colors.surface).shadow(color: .black.opacity(0.08), radius: 3, y: 1)
-                }
-            }
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -200,7 +177,7 @@ struct PromptCardView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Colors.muted)
                     .padding(.trailing, 4)
-                Text("\(max(1, (prompt.count + 4) / 5)) Tokens")
+                Text("\(max(0, (prompt.count + 4) / 5)) Tokens")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Colors.control)
                     .padding(.horizontal, 9)
@@ -259,11 +236,12 @@ struct RunAgentButton: View {
 struct CompletedResultCard: View {
     let viewState: ViewState
     let model: UIModel
+    let elapsedTime: TimeInterval
 
     var body: some View {
         VStack(spacing: 0) {
-            CompletedStatusHeader(viewState: viewState, model: model)
-            ModelResponseView(imageName: model.responseImageName)
+            CompletedStatusHeader(viewState: viewState, model: model, elapsedTime: elapsedTime)
+            ModelResponseView(responseText: model.responseText)
         }
         .background(Colors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -278,6 +256,7 @@ struct CompletedResultCard: View {
 struct CompletedStatusHeader: View {
     let viewState: ViewState
     let model: UIModel
+    let elapsedTime: TimeInterval
 
     var body: some View {
         HStack(spacing: 8) {
@@ -313,7 +292,7 @@ struct CompletedStatusHeader: View {
     private var statusText: String {
         switch viewState {
         case .executing:
-            return "Running • 0.2s"
+            return "Running • \(String(format: "%.1fs", elapsedTime))"
         case .executed(let result):
             return "Completed • \(result.completionDuration)"
         case .failed:
@@ -337,7 +316,7 @@ struct CompletedStatusHeader: View {
 }
 
 struct ModelResponseView: View {
-    let imageName: String
+    let responseText: String
 
     var body: some View {
         VStack(spacing: 0) {
@@ -354,21 +333,12 @@ struct ModelResponseView: View {
             .padding(.horizontal, 16)
             .overlay(alignment: .bottom) { Color.black.opacity(0.05).frame(height: 1) }
 
-            InfographicPreview(imageName: imageName)
+            Text(responseText.isEmpty ? "Generated response will appear here." : responseText)
+                .font(.system(size: 14))
+                .foregroundStyle(Colors.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
                 .padding(16)
         }
-    }
-}
-
-struct InfographicPreview: View {
-    let imageName: String
-
-    var body: some View {
-        Image(imageName)
-            .resizable()
-            .aspectRatio(contentMode: .fill)
-            .frame(maxWidth: .infinity)
-            .aspectRatio(1.67, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 13))
     }
 }
