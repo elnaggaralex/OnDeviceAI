@@ -419,13 +419,21 @@ struct CompletedResultCard: View {
     let viewState: ViewState
     let model: UIModel
     let elapsedTime: TimeInterval
+    let onToggleSpeechPlayback: () -> Void
+    let onStopSpeechPlayback: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             CompletedStatusHeader(viewState: viewState, model: model, elapsedTime: elapsedTime)
             ModelResponseView(
                 response: model.structuredResponse,
-                errorMessage: model.errorMessage
+                errorMessage: model.errorMessage,
+                speechText: model.speechText,
+                speechStyle: model.speechStyle,
+                speechGender: model.speechGender,
+                speechPlaybackState: model.speechPlaybackState,
+                onToggleSpeechPlayback: onToggleSpeechPlayback,
+                onStopSpeechPlayback: onStopSpeechPlayback
             )
         }
         .background(Colors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -503,14 +511,20 @@ struct CompletedStatusHeader: View {
 struct ModelResponseView: View {
     let response: TextTaskResult.PartiallyGenerated?
     let errorMessage: String?
+    let speechText: String?
+    let speechStyle: RequestedSpeechStyle?
+    let speechGender: RequestedSpeechGender?
+    let speechPlaybackState: SpeechPlaybackState
+    let onToggleSpeechPlayback: () -> Void
+    let onStopSpeechPlayback: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "text.bubble")
+                Image(systemName: speechText == nil ? "text.bubble" : "waveform")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Colors.blue)
-                Text("Model Response")
+                Text(speechText == nil ? "Model Response" : "Generated Speech")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Colors.blue)
                 Spacer()
@@ -527,6 +541,49 @@ struct ModelResponseView: View {
                     Text(errorMessage)
                         .font(.system(size: 14))
                         .foregroundStyle(Colors.muted)
+                        .textSelection(.enabled)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+            } else if let speechText {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 10) {
+                        Button(action: onToggleSpeechPlayback) {
+                            Label(speechPlaybackButtonTitle, systemImage: speechPlaybackButtonIcon)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(Colors.blue, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+
+                        if speechPlaybackState != .idle {
+                            Button(action: onStopSpeechPlayback) {
+                                Label("Stop", systemImage: "stop.fill")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Colors.control)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+
+                    if let speechStyle {
+                        Text("Voice style: \(speechStyleLabel(speechStyle))")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Colors.muted)
+                    }
+
+                    if let speechGender, speechGender != .unspecified {
+                        Text("Speaker: \(speechGender == .male ? "Male" : "Female")")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Colors.muted)
+                    }
+
+                    Text(speechText)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Colors.ink)
                         .textSelection(.enabled)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -570,6 +627,31 @@ struct ModelResponseView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
             }
+        }
+    }
+
+    private var speechPlaybackButtonTitle: String {
+        switch speechPlaybackState {
+        case .idle: return "Play"
+        case .speaking: return "Pause"
+        case .paused: return "Resume"
+        }
+    }
+
+    private var speechPlaybackButtonIcon: String {
+        switch speechPlaybackState {
+        case .idle: return "play.fill"
+        case .speaking: return "pause.fill"
+        case .paused: return "play.fill"
+        }
+    }
+
+    private func speechStyleLabel(_ style: RequestedSpeechStyle) -> String {
+        switch style {
+        case .natural: return "Natural"
+        case .childlike: return "Childlike (pitch adjusted)"
+        case .calm: return "Calm"
+        case .energetic: return "Energetic"
         }
     }
 }

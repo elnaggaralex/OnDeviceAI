@@ -57,7 +57,9 @@ struct HomeView: View {
                     CompletedResultCard(
                         viewState: viewModel.viewState,
                         model: viewModel.uiModel,
-                        elapsedTime: viewModel.elapsedTime
+                        elapsedTime: viewModel.elapsedTime,
+                        onToggleSpeechPlayback: { viewModel.toggleSpeechPlayback() },
+                        onStopSpeechPlayback: { viewModel.stopSpeechPlayback() }
                     )
                 }
                 .padding(.horizontal, 16)
