@@ -24,17 +24,9 @@ final class TextProcessingProvider {
         self.session = session
     }
 
-    func streamResponse(
-        to prompt: String,
-        imageURLs: [URL] = []
-    ) -> LanguageModelSession.ResponseStream<TextTaskResult> {
+    func streamResponse(to prompt: String) -> LanguageModelSession.ResponseStream<TextTaskResult> {
         session.streamResponse(generating: TextTaskResult.self) {
-            Prompt {
-                prompt
-                for imageURL in imageURLs {
-                    Attachment(imageURL: imageURL)
-                }
-            }
+            prompt
         }
     }
 }

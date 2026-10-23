@@ -22,6 +22,7 @@ final class HomeViewModel {
     }
     
     private let textProcessingProvider = TextProcessingProvider()
+    private let imageProcessingProvider = ImageProcessingProvider()
     private var generationTask: Task<Void, Never>?
     private var elapsedTimerTask: Task<Void, Never>?
     private var activeGenerationID: UUID?
@@ -148,7 +149,11 @@ final class HomeViewModel {
                 }
             }
 
-            for try await snapshot in textProcessingProvider.streamResponse(to: modelPrompt, imageURLs: imageURLs) {
+            let responseStream = imageURLs.isEmpty
+                ? textProcessingProvider.streamResponse(to: modelPrompt)
+                : imageProcessingProvider.streamResponse(to: modelPrompt, imageURLs: imageURLs)
+
+            for try await snapshot in responseStream {
                 try Task.checkCancellation()
                 guard activeGenerationID == generationID else { return }
                 homeUI.uiModel.structuredResponse = snapshot.content
