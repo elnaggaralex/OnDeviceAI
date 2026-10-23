@@ -1,5 +1,6 @@
 import SwiftUI
 import FoundationModels
+import PhotosUI
 import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
@@ -140,6 +141,8 @@ struct PromptCardView: View {
     @Binding var attachedFiles: [URL]
     let consumedTokenCount: Int?
     @State private var isAttachmentPickerPresented = false
+    @State private var isPhotoPickerPresented = false
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
 
     var body: some View {
         VStack(spacing: 12) {
@@ -191,8 +194,17 @@ struct PromptCardView: View {
                         .foregroundStyle(Colors.control)
                         .frame(width: 28, height: 28)
                 }
-                Button {
-                    isAttachmentPickerPresented = true
+                Menu {
+                    Button {
+                        isAttachmentPickerPresented = true
+                    } label: {
+                        Label("Choose Files", systemImage: "doc")
+                    }
+                    Button {
+                        isPhotoPickerPresented = true
+                    } label: {
+                        Label("Choose Photos", systemImage: "photo")
+                    }
                 } label: {
                     Image(systemName: "paperclip")
                         .font(.system(size: 17, weight: .medium))
@@ -222,6 +234,17 @@ struct PromptCardView: View {
                         attachedFiles = uniqueURLs
                     }
                 }
+                .photosPicker(
+                    isPresented: $isPhotoPickerPresented,
+                    selection: $selectedPhotoItems,
+                    matching: .images
+                )
+                .onChange(of: selectedPhotoItems) { _, items in
+                    guard !items.isEmpty else { return }
+                    Task {
+                        await importPhotos(items)
+                    }
+                }
                 Spacer()
                 Button("Clear") { prompt = "" }
                     .font(.system(size: 12))
@@ -238,6 +261,29 @@ struct PromptCardView: View {
         .padding(16)
         .background(Colors.surface, in: RoundedRectangle(cornerRadius: 21))
         .overlay(RoundedRectangle(cornerRadius: 21).stroke(Colors.border, lineWidth: 1))
+    }
+
+    @MainActor
+    private func importPhotos(_ items: [PhotosPickerItem]) async {
+        var importedURLs: [URL] = []
+
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            let fileExtension = item.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
+            let destination = FileManager.default.temporaryDirectory
+                .appendingPathComponent("photo-\(UUID().uuidString)")
+                .appendingPathExtension(fileExtension)
+
+            do {
+                try data.write(to: destination, options: .atomic)
+                importedURLs.append(destination)
+            } catch {
+                continue
+            }
+        }
+
+        attachedFiles.append(contentsOf: importedURLs)
+        selectedPhotoItems = []
     }
 }
 
