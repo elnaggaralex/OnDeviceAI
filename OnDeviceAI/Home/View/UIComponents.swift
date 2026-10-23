@@ -1,4 +1,12 @@
 import SwiftUI
+import UniformTypeIdentifiers
+#if canImport(UIKit)
+import UIKit
+private typealias AttachmentImage = UIImage
+#elseif canImport(AppKit)
+import AppKit
+private typealias AttachmentImage = NSImage
+#endif
 
 struct AgentHeaderView: View {
     var body: some View {
@@ -128,6 +136,8 @@ private struct CustomModelSelectionView: View {
 
 struct PromptCardView: View {
     @Binding var prompt: String
+    @State private var isAttachmentPickerPresented = false
+    @State private var attachedFiles: [URL] = []
 
     var body: some View {
         VStack(spacing: 12) {
@@ -157,6 +167,17 @@ struct PromptCardView: View {
                 .textFieldStyle(.plain)
                 .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
 
+            if !attachedFiles.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(attachedFiles, id: \.self) { fileURL in
+                            AttachmentPreviewView(fileURL: fileURL)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
             SeparatorView()
 
             HStack {
@@ -166,11 +187,36 @@ struct PromptCardView: View {
                         .foregroundStyle(Colors.control)
                         .frame(width: 28, height: 28)
                 }
-                Button {} label: {
+                Button {
+                    isAttachmentPickerPresented = true
+                } label: {
                     Image(systemName: "paperclip")
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(Colors.control)
                         .frame(width: 28, height: 28)
+                        .overlay(alignment: .topTrailing) {
+                            if !attachedFiles.isEmpty {
+                                Text("\(attachedFiles.count)")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(minWidth: 13, minHeight: 13)
+                                    .background(Colors.purple, in: Circle())
+                                    .offset(x: 4, y: -4)
+                            }
+                        }
+                }
+                .fileImporter(
+                    isPresented: $isAttachmentPickerPresented,
+                    allowedContentTypes: [.text, .image, .audio],
+                    allowsMultipleSelection: true
+                ) { result in
+                    if case let .success(urls) = result {
+                        var uniqueURLs: [URL] = []
+                        for url in attachedFiles + urls where !uniqueURLs.contains(url) {
+                            uniqueURLs.append(url)
+                        }
+                        attachedFiles = uniqueURLs
+                    }
                 }
                 Spacer()
                 Button("Clear") { prompt = "" }
@@ -188,6 +234,80 @@ struct PromptCardView: View {
         .padding(16)
         .background(Colors.surface, in: RoundedRectangle(cornerRadius: 21))
         .overlay(RoundedRectangle(cornerRadius: 21).stroke(Colors.border, lineWidth: 1))
+    }
+}
+
+private struct AttachmentPreviewView: View {
+    let fileURL: URL
+    @State private var thumbnail: AttachmentImage?
+
+    private var isImage: Bool {
+        UTType(filenameExtension: fileURL.pathExtension)?.conforms(to: .image) == true
+    }
+
+    private var fileIcon: String {
+        if UTType(filenameExtension: fileURL.pathExtension)?.conforms(to: .audio) == true {
+            return "waveform"
+        }
+        return "doc.text"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if isImage {
+                imageThumbnail
+                    .frame(width: 76, height: 60)
+                    .background(Colors.surfaceInset, in: RoundedRectangle(cornerRadius: 9))
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+            } else {
+                Image(systemName: fileIcon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(Colors.blue)
+                    .frame(width: 76, height: 60)
+                    .background(Colors.surfaceInset, in: RoundedRectangle(cornerRadius: 9))
+            }
+
+            Text(fileURL.lastPathComponent)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Colors.label)
+                .lineLimit(1)
+                .frame(width: 76, alignment: .leading)
+        }
+        .task(id: fileURL) {
+            guard isImage else { return }
+            let didStartAccessing = fileURL.startAccessingSecurityScopedResource()
+            defer {
+                if didStartAccessing {
+                    fileURL.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            #if canImport(UIKit)
+            thumbnail = UIImage(contentsOfFile: fileURL.path)
+            #elseif canImport(AppKit)
+            thumbnail = NSImage(contentsOf: fileURL)
+            #endif
+        }
+    }
+
+    @ViewBuilder
+    private var imageThumbnail: some View {
+        if let thumbnail {
+            #if canImport(UIKit)
+            Image(uiImage: thumbnail)
+                .resizable()
+                .scaledToFill()
+            #elseif canImport(AppKit)
+            Image(nsImage: thumbnail)
+                .resizable()
+                .scaledToFill()
+            #endif
+        } else {
+            Image(systemName: "photo")
+                .font(.system(size: 20))
+                .foregroundStyle(Colors.muted)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 }
 
