@@ -45,7 +45,11 @@ struct HomeView: View {
                     ) {
                         viewModel.isModelPickerPresented = true
                     }
-                    PromptCardView(prompt: promptBinding, attachedFiles: attachedFilesBinding)
+                    PromptCardView(
+                        prompt: promptBinding,
+                        attachedFiles: attachedFilesBinding,
+                        consumedTokenCount: viewModel.uiModel.consumedTokenCount
+                    )
                     RunAgentButton(isRunning: isExecuting) {
                         viewModel.toggleExecutionState()
                     }

@@ -138,6 +138,7 @@ private struct CustomModelSelectionView: View {
 struct PromptCardView: View {
     @Binding var prompt: String
     @Binding var attachedFiles: [URL]
+    let consumedTokenCount: Int?
     @State private var isAttachmentPickerPresented = false
 
     var body: some View {
@@ -226,7 +227,7 @@ struct PromptCardView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Colors.muted)
                     .padding(.trailing, 4)
-                Text("\(max(0, (prompt.count + 4) / 5)) Tokens")
+                Text("\(consumedTokenCount.map(String.init) ?? "—") tokens")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Colors.control)
                     .padding(.horizontal, 9)

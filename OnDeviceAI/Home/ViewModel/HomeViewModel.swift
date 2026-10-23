@@ -84,6 +84,7 @@ final class HomeViewModel {
                 return
             }
             homeUI.uiModel.structuredResponse = nil
+            homeUI.uiModel.consumedTokenCount = nil
             let startTime = Date()
             let generationID = UUID()
             activeGenerationID = generationID
@@ -157,6 +158,7 @@ final class HomeViewModel {
                 try Task.checkCancellation()
                 guard activeGenerationID == generationID else { return }
                 homeUI.uiModel.structuredResponse = snapshot.content
+                homeUI.uiModel.consumedTokenCount = snapshot.usage.totalTokenCount
             }
 
             guard activeGenerationID == generationID else { return }
@@ -219,6 +221,7 @@ struct UIModel {
     var modelName = "Apple Intelligence"
     var customModelName = "GPT-4o"
     var completionDuration = "0s"
+    var consumedTokenCount: Int?
     var structuredResponse: TextTaskResult.PartiallyGenerated?
 }
 
