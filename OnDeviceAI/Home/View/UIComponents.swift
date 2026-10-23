@@ -136,8 +136,8 @@ private struct CustomModelSelectionView: View {
 
 struct PromptCardView: View {
     @Binding var prompt: String
+    @Binding var attachedFiles: [URL]
     @State private var isAttachmentPickerPresented = false
-    @State private var attachedFiles: [URL] = []
 
     var body: some View {
         VStack(spacing: 12) {

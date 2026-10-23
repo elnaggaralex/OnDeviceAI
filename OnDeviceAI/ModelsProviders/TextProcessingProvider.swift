@@ -1,3 +1,4 @@
+import Foundation
 import FoundationModels
 
 @MainActor
@@ -8,7 +9,17 @@ final class TextProcessingProvider {
         self.session = session
     }
 
-    func streamResponse(to prompt: String) -> LanguageModelSession.ResponseStream<String> {
-        session.streamResponse(to: prompt)
+    func streamResponse(
+        to prompt: String,
+        imageURLs: [URL] = []
+    ) -> LanguageModelSession.ResponseStream<String> {
+        session.streamResponse {
+            Prompt {
+                prompt
+                for imageURL in imageURLs {
+                    Attachment(imageURL: imageURL)
+                }
+            }
+        }
     }
 }

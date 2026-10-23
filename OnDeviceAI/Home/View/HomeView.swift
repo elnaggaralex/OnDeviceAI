@@ -11,6 +11,13 @@ struct HomeView: View {
         )
     }
 
+    private var attachedFilesBinding: Binding<[URL]> {
+        Binding(
+            get: { viewModel.uiModel.attachedFiles },
+            set: { viewModel.updateAttachedFiles($0) }
+        )
+    }
+
     private var modeBinding: Binding<Int> {
         Binding(
             get: { viewModel.uiModel.selectedMode },
@@ -38,11 +45,11 @@ struct HomeView: View {
                     ) {
                         viewModel.isModelPickerPresented = true
                     }
-                    PromptCardView(prompt: promptBinding)
+                    PromptCardView(prompt: promptBinding, attachedFiles: attachedFilesBinding)
                     RunAgentButton(isRunning: isExecuting) {
                         viewModel.toggleExecutionState()
                     }
-                    .disabled(!isExecuting && viewModel.uiModel.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(!isExecuting && !viewModel.canRunAgent)
                     CompletedResultCard(
                         viewState: viewModel.viewState,
                         model: viewModel.uiModel,
