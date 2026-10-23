@@ -423,7 +423,10 @@ struct CompletedResultCard: View {
     var body: some View {
         VStack(spacing: 0) {
             CompletedStatusHeader(viewState: viewState, model: model, elapsedTime: elapsedTime)
-            ModelResponseView(response: model.structuredResponse)
+            ModelResponseView(
+                response: model.structuredResponse,
+                errorMessage: model.errorMessage
+            )
         }
         .background(Colors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -499,6 +502,7 @@ struct CompletedStatusHeader: View {
 
 struct ModelResponseView: View {
     let response: TextTaskResult.PartiallyGenerated?
+    let errorMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -515,7 +519,19 @@ struct ModelResponseView: View {
             .padding(.horizontal, 16)
             .overlay(alignment: .bottom) { Color.black.opacity(0.05).frame(height: 1) }
 
-            if let response {
+            if let errorMessage {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Couldn’t complete the request")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Colors.ink)
+                    Text(errorMessage)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Colors.muted)
+                        .textSelection(.enabled)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+            } else if let response {
                 VStack(alignment: .leading, spacing: 14) {
                     if let title = response.title, !title.isEmpty {
                         Text(title)

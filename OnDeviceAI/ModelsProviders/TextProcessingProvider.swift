@@ -6,7 +6,7 @@ struct TextTaskResult {
     @Guide(description: "A concise title describing the result.")
     var title: String
 
-    @Guide(description: "The main answer to the user's request. For a summary, provide a concise synthesis of the source text.")
+    @Guide(description: "The main answer to the user's request. For a summary, provide a concise synthesis; for verbatim transcription, reproduce the complete transcript in its original language.")
     var response: String
 
     @Guide(description: "Up to five important facts that support or clarify the response. Use an empty list when none are useful.", .maximumCount(5))
