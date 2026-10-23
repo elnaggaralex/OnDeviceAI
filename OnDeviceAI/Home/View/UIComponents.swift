@@ -1,4 +1,5 @@
 import SwiftUI
+import FoundationModels
 import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
@@ -361,7 +362,7 @@ struct CompletedResultCard: View {
     var body: some View {
         VStack(spacing: 0) {
             CompletedStatusHeader(viewState: viewState, model: model, elapsedTime: elapsedTime)
-            ModelResponseView(responseText: model.responseText)
+            ModelResponseView(response: model.structuredResponse)
         }
         .background(Colors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -436,7 +437,7 @@ struct CompletedStatusHeader: View {
 }
 
 struct ModelResponseView: View {
-    let responseText: String
+    let response: TextTaskResult.PartiallyGenerated?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -453,12 +454,70 @@ struct ModelResponseView: View {
             .padding(.horizontal, 16)
             .overlay(alignment: .bottom) { Color.black.opacity(0.05).frame(height: 1) }
 
-            Text(responseText.isEmpty ? "Generated response will appear here." : responseText)
-                .font(.system(size: 14))
-                .foregroundStyle(Colors.ink)
+            if let response {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let title = response.title, !title.isEmpty {
+                        Text(title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Colors.ink)
+                    }
+
+                    if let mainResponse = response.response, !mainResponse.isEmpty {
+                        Text(mainResponse)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Colors.ink)
+                            .textSelection(.enabled)
+                    }
+
+                    if let keyPoints = response.keyPoints, !keyPoints.isEmpty {
+                        StructuredResponseList(title: "Key points", items: keyPoints)
+                    }
+
+                    if let actionItems = response.actionItems, !actionItems.isEmpty {
+                        StructuredResponseList(title: "Action items", items: actionItems)
+                    }
+
+                    if response.title == nil && response.response == nil
+                        && response.keyPoints == nil && response.actionItems == nil {
+                        Text("Generating structured response…")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Colors.muted)
+                    }
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
                 .padding(16)
+            } else {
+                Text("Generated response will appear here.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Colors.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+            }
+        }
+    }
+}
+
+private struct StructuredResponseList: View {
+    let title: String
+    let items: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Colors.label)
+
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Circle()
+                        .fill(Colors.blue)
+                        .frame(width: 4, height: 4)
+                    Text(item)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Colors.ink)
+                        .textSelection(.enabled)
+                }
+            }
         }
     }
 }

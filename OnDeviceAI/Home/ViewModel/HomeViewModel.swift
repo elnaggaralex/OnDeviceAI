@@ -82,7 +82,7 @@ final class HomeViewModel {
                 homeUI.viewState = .failed
                 return
             }
-            homeUI.uiModel.responseText = ""
+            homeUI.uiModel.structuredResponse = nil
             let startTime = Date()
             let generationID = UUID()
             activeGenerationID = generationID
@@ -151,7 +151,7 @@ final class HomeViewModel {
             for try await snapshot in textProcessingProvider.streamResponse(to: modelPrompt, imageURLs: imageURLs) {
                 try Task.checkCancellation()
                 guard activeGenerationID == generationID else { return }
-                homeUI.uiModel.responseText = snapshot.content
+                homeUI.uiModel.structuredResponse = snapshot.content
             }
 
             guard activeGenerationID == generationID else { return }
@@ -214,7 +214,7 @@ struct UIModel {
     var modelName = "Apple Intelligence"
     var customModelName = "GPT-4o"
     var completionDuration = "0s"
-    var responseText = ""
+    var structuredResponse: TextTaskResult.PartiallyGenerated?
 }
 
 private extension HomeViewModel {
