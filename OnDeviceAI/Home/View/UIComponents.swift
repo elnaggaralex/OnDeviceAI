@@ -172,7 +172,9 @@ struct PromptCardView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 10) {
                         ForEach(attachedFiles, id: \.self) { fileURL in
-                            AttachmentPreviewView(fileURL: fileURL)
+                            AttachmentPreviewView(fileURL: fileURL) {
+                                attachedFiles.removeAll { $0 == fileURL }
+                            }
                         }
                     }
                     .padding(.vertical, 2)
@@ -240,6 +242,7 @@ struct PromptCardView: View {
 
 private struct AttachmentPreviewView: View {
     let fileURL: URL
+    let onRemove: () -> Void
     @State private var thumbnail: AttachmentImage?
 
     private var isImage: Bool {
@@ -255,18 +258,29 @@ private struct AttachmentPreviewView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            if isImage {
-                imageThumbnail
-                    .frame(width: 76, height: 60)
-                    .background(Colors.surfaceInset, in: RoundedRectangle(cornerRadius: 9))
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
-            } else {
-                Image(systemName: fileIcon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Colors.blue)
-                    .frame(width: 76, height: 60)
-                    .background(Colors.surfaceInset, in: RoundedRectangle(cornerRadius: 9))
+            ZStack(alignment: .topTrailing) {
+                if isImage {
+                    imageThumbnail
+                        .frame(width: 76, height: 60)
+                } else {
+                    Image(systemName: fileIcon)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Colors.blue)
+                        .frame(width: 76, height: 60)
+                }
+
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .background(.black.opacity(0.45), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(3)
+                .accessibilityLabel("Remove \(fileURL.lastPathComponent)")
             }
+            .background(Colors.surfaceInset, in: RoundedRectangle(cornerRadius: 9))
+            .clipShape(RoundedRectangle(cornerRadius: 9))
 
             Text(fileURL.lastPathComponent)
                 .font(.system(size: 10, weight: .medium))
