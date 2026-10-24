@@ -431,6 +431,8 @@ struct CompletedResultCard: View {
                 speechText: model.speechText,
                 speechStyle: model.speechStyle,
                 speechGender: model.speechGender,
+                imageGenerationRequest: model.imageGenerationRequest,
+                generatedImageURL: model.generatedImageURL,
                 speechPlaybackState: model.speechPlaybackState,
                 onToggleSpeechPlayback: onToggleSpeechPlayback,
                 onStopSpeechPlayback: onStopSpeechPlayback
@@ -514,6 +516,8 @@ struct ModelResponseView: View {
     let speechText: String?
     let speechStyle: RequestedSpeechStyle?
     let speechGender: RequestedSpeechGender?
+    let imageGenerationRequest: ImageGenerationRequest?
+    let generatedImageURL: URL?
     let speechPlaybackState: SpeechPlaybackState
     let onToggleSpeechPlayback: () -> Void
     let onStopSpeechPlayback: () -> Void
@@ -521,10 +525,10 @@ struct ModelResponseView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: speechText == nil ? "text.bubble" : "waveform")
+                Image(systemName: generatedImageURL != nil ? "photo" : (speechText == nil ? "text.bubble" : "waveform"))
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Colors.blue)
-                Text(speechText == nil ? "Model Response" : "Generated Speech")
+                Text(generatedImageURL != nil ? "Generated Image" : (speechText == nil ? "Model Response" : "Generated Speech"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Colors.blue)
                 Spacer()
@@ -542,6 +546,21 @@ struct ModelResponseView: View {
                         .font(.system(size: 14))
                         .foregroundStyle(Colors.muted)
                         .textSelection(.enabled)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+            } else if let generatedImageURL {
+                VStack(alignment: .leading, spacing: 10) {
+                    GeneratedImagePreview(url: generatedImageURL)
+                    if let imageGenerationRequest {
+                        Text(imageGenerationRequest.description)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Colors.ink)
+                            .textSelection(.enabled)
+                    }
+                    Text("Created with Image Playground")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Colors.muted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
@@ -653,6 +672,41 @@ struct ModelResponseView: View {
         case .calm: return "Calm"
         case .energetic: return "Energetic"
         }
+    }
+}
+
+private struct GeneratedImagePreview: View {
+    let url: URL
+    @State private var image: AttachmentImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                #if canImport(UIKit)
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                #elseif canImport(AppKit)
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                #endif
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(maxHeight: 360)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .task(id: url) {
+            #if canImport(UIKit)
+            image = UIImage(contentsOfFile: url.path)
+            #elseif canImport(AppKit)
+            image = NSImage(contentsOf: url)
+            #endif
+        }
+        .accessibilityLabel("Generated image")
     }
 }
 

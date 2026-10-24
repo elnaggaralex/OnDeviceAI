@@ -1,4 +1,5 @@
 import SwiftUI
+import ImagePlayground
 
 struct HomeView: View {
     @State private var viewModel = HomeViewModel()
@@ -69,6 +70,15 @@ struct HomeView: View {
         }
         .background(Colors.page.ignoresSafeArea())
         .preferredColorScheme(.light)
+        .imagePlaygroundGenerationStyle(
+            viewModel.imageGenerationRequest?.style.playgroundStyle ?? .any
+        )
+        .imagePlaygroundSheet(
+            isPresented: imagePlaygroundBinding,
+            concepts: imagePlaygroundConcepts,
+            onCompletion: { viewModel.didCreateImage(at: $0) },
+            onCancellation: { viewModel.cancelledImageGeneration() }
+        )
         .task {
             viewModel.checkAppleIntelligenceAvailability()
         }
@@ -95,6 +105,18 @@ struct HomeView: View {
     private var isExecuting: Bool {
         if case .executing = viewModel.viewState { return true }
         return false
+    }
+
+    private var imagePlaygroundBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.isImagePlaygroundPresented },
+            set: { viewModel.isImagePlaygroundPresented = $0 }
+        )
+    }
+
+    private var imagePlaygroundConcepts: [ImagePlaygroundConcept] {
+        guard let request = viewModel.imageGenerationRequest else { return [] }
+        return [.text(request.description)]
     }
 }
 

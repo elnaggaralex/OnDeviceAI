@@ -25,14 +25,20 @@ final class HomeViewModel {
     
     private let textProcessingProvider: TextProcessingProvider
     private let speechSynthesisProvider: SpeechSynthesisProvider
+    private let imagePlaygroundProvider: ImagePlaygroundProvider
     private var generationTask: Task<Void, Never>?
     private var elapsedTimerTask: Task<Void, Never>?
     private var activeGenerationID: UUID?
 
     init() {
         let speechProvider = SpeechSynthesisProvider()
+        let imageProvider = ImagePlaygroundProvider()
         speechSynthesisProvider = speechProvider
-        textProcessingProvider = TextProcessingProvider(speechSynthesisProvider: speechProvider)
+        imagePlaygroundProvider = imageProvider
+        textProcessingProvider = TextProcessingProvider(
+            speechSynthesisProvider: speechProvider,
+            imagePlaygroundProvider: imageProvider
+        )
         speechProvider.onPlaybackStateChange = { [weak self] state in
             self?.homeUI.uiModel.speechPlaybackState = state
         }
@@ -41,6 +47,12 @@ final class HomeViewModel {
             self?.homeUI.uiModel.speechStyle = style
             self?.homeUI.uiModel.speechGender = gender
             self?.homeUI.uiModel.speechLanguageCode = languageCode
+        }
+        imageProvider.onGenerationRequest = { [weak self] request in
+            guard let self else { return }
+            self.homeUI.uiModel.imageGenerationRequest = request
+            self.homeUI.uiModel.generatedImageURL = nil
+            self.homeUI.isImagePlaygroundPresented = true
         }
     }
 
@@ -53,6 +65,26 @@ final class HomeViewModel {
     var isModelPickerPresented: Bool {
         get { homeUI.isModelPickerPresented }
         set { homeUI.isModelPickerPresented = newValue }
+    }
+
+    var isImagePlaygroundPresented: Bool {
+        get { homeUI.isImagePlaygroundPresented }
+        set { homeUI.isImagePlaygroundPresented = newValue }
+    }
+
+    var imageGenerationRequest: ImageGenerationRequest? {
+        homeUI.uiModel.imageGenerationRequest
+    }
+
+    func didCreateImage(at url: URL) {
+        homeUI.uiModel.generatedImageURL = url
+        homeUI.isImagePlaygroundPresented = false
+        refreshExecutedStateIfNeeded()
+    }
+
+    func cancelledImageGeneration() {
+        homeUI.uiModel.imageGenerationRequest = nil
+        homeUI.isImagePlaygroundPresented = false
     }
 
     func updatePrompt(_ prompt: String) {
@@ -105,8 +137,12 @@ final class HomeViewModel {
             homeUI.uiModel.consumedTokenCount = nil
             homeUI.uiModel.speechText = nil
             homeUI.uiModel.speechPlaybackState = .idle
+            homeUI.uiModel.generatedImageURL = nil
+            homeUI.uiModel.imageGenerationRequest = nil
+            homeUI.isImagePlaygroundPresented = false
             speechSynthesisProvider.stop()
             speechSynthesisProvider.prepareForNewRequest()
+            imagePlaygroundProvider.prepareForNewRequest()
             let startTime = Date()
             let generationID = UUID()
             activeGenerationID = generationID
@@ -218,7 +254,8 @@ final class HomeViewModel {
                 : MediaProcessingProvider(
                     imageURLs: imageURLs,
                     audioURLs: audioURLs,
-                    speechSynthesisProvider: speechSynthesisProvider
+                    speechSynthesisProvider: speechSynthesisProvider,
+                    imagePlaygroundProvider: imagePlaygroundProvider
                 )
                     .streamResponse(to: modelPrompt)
 
@@ -298,6 +335,8 @@ struct UIModel {
     var speechGender: RequestedSpeechGender?
     var speechLanguageCode = "en-US"
     var speechPlaybackState: SpeechPlaybackState = .idle
+    var imageGenerationRequest: ImageGenerationRequest?
+    var generatedImageURL: URL?
 }
 
 private extension HomeViewModel {
@@ -305,6 +344,7 @@ private extension HomeViewModel {
         var viewState: ViewState
         var uiModel: UIModel
         var isModelPickerPresented = false
+        var isImagePlaygroundPresented = false
 
         init() {
             let model = UIModel()
