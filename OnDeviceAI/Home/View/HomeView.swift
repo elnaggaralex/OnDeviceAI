@@ -38,6 +38,12 @@ struct HomeView: View {
             VStack(spacing: 0) {
                 AgentHeaderView()
 
+                if !viewModel.modelDownloadManager.activeDownloads.isEmpty {
+                    ModelDownloadsStatusView(downloads: viewModel.modelDownloadManager.activeDownloads)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                }
+
                 VStack(spacing: 16) {
                     AgentModePicker(selection: modeBinding)
                     ModelCardView(
@@ -55,6 +61,14 @@ struct HomeView: View {
                         viewModel.toggleExecutionState()
                     }
                     .disabled(!isExecuting && !viewModel.canRunAgent)
+                    .alert("Model Not Downloaded", isPresented: $viewModel.isSelectedModelNotDownloadedAlertPresented) {
+                        Button("Download") {
+                            viewModel.downloadSelectedModel()
+                        }
+                        Button("Close", role: .cancel) { }
+                    } message: {
+                        Text("\(viewModel.uiModel.customModelName) must be downloaded before you can use it.")
+                    }
                     CompletedResultCard(
                         viewState: viewModel.viewState,
                         model: viewModel.uiModel,
@@ -93,7 +107,10 @@ struct HomeView: View {
             Text("Apple Intelligence is available on this device but is turned off. You can enable it in Settings to use the on-device model.")
         }
         .sheet(isPresented: modelPickerBinding) {
-            ModelPickerSheet(selectedModel: viewModel.uiModel.customModelName) { model in
+            ModelPickerSheet(
+                selectedModel: viewModel.uiModel.customModelName,
+                downloadManager: viewModel.modelDownloadManager
+            ) { model in
                 viewModel.selectCustomModel(model)
             }
             .presentationDetents([.large])

@@ -53,7 +53,7 @@ struct ModelSearchField: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(Colors.muted)
-            TextField("Search models, architectures, or context…", text: $query)
+            TextField("Search models or tasks…", text: $query)
                 .font(.system(size: 16))
                 .tint(Colors.blue)
                 .textInputAutocapitalization(.never)
@@ -101,17 +101,17 @@ private struct ModelFilterChip: View {
     private var icon: String? {
         switch filter {
         case .all: return nil
-        case .downloaded: return "checkmark.circle"
-        case .small: return "cpu"
-        case .reasoning: return "brain.head.profile"
+        case .text: return "text.alignleft"
+        case .vision: return "viewfinder"
+        case .audio: return "waveform"
+        case .other: return "cpu"
         }
     }
 
     private var iconColor: Color {
         switch filter {
-        case .all: return Colors.control
-        case .downloaded, .reasoning: return Colors.blue
-        case .small: return Colors.purple
+        case .all, .text, .vision, .audio: return Colors.blue
+        case .other: return Colors.purple
         }
     }
 
@@ -137,47 +137,72 @@ private struct ModelFilterChip: View {
 struct ModelOptionCard: View {
     let model: AIModelOption
     let isSelected: Bool
+    let isDownloaded: Bool
+    let isDownloading: Bool
+    let downloadProgress: Double?
+    let downloadError: String?
     let onSelect: () -> Void
+    let onDownload: () -> Void
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(alignment: .top, spacing: 14) {
-                modelIcon
+        HStack(alignment: .top, spacing: 10) {
+            Button(action: onSelect) {
+                HStack(alignment: .top, spacing: 14) {
+                    modelIcon
 
-                VStack(alignment: .leading, spacing: 5) {
-                    title
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top, spacing: 10) {
+                            title
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if isSelected {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 28, height: 28)
+                                    .background(Colors.blue, in: Circle())
+                            }
+                        }
 
-                    Text(model.source)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Colors.control)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-
-                    HStack(spacing: 8) {
-                        Image(systemName: model.downloaded ? "checkmark.circle" : "bolt.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(model.detail)
+                        Text(model.repositoryID)
                             .font(.system(size: 12, weight: .medium))
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                    }
-                    .foregroundStyle(model.downloaded ? Colors.blue : Colors.muted)
-                    .padding(.top, 2)
-                }
+                            .foregroundStyle(Colors.control)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer(minLength: 0)
-                trailingBadge
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "checkmark.seal")
+                                .font(.system(size: 12, weight: .semibold))
+                                .padding(.top, 2)
+                            Text("\(model.task) • \(model.license)")
+                                .font(.system(size: 12, weight: .medium))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .foregroundStyle(Colors.muted)
+
+                        if let downloadError {
+                            Label(downloadError, systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Colors.surface, in: RoundedRectangle(cornerRadius: 24))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(isSelected ? Colors.blue.opacity(0.55) : Colors.border.opacity(0.8), lineWidth: isSelected ? 1.5 : 1)
-            }
-            .shadow(color: isSelected ? Colors.purple.opacity(0.10) : .black.opacity(0.035), radius: isSelected ? 15 : 7, y: 4)
+            .buttonStyle(.plain)
+
+            downloadButton
         }
-        .buttonStyle(.plain)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Colors.surface, in: RoundedRectangle(cornerRadius: 24))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(isSelected ? Colors.blue : Colors.border.opacity(0.8), lineWidth: isSelected ? 2 : 1)
+        }
+        .shadow(color: isSelected ? Colors.purple.opacity(0.10) : .black.opacity(0.035), radius: isSelected ? 15 : 7, y: 4)
     }
 
     private var modelIcon: some View {
@@ -195,79 +220,50 @@ struct ModelOptionCard: View {
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .tracking(-0.35)
                 .foregroundStyle(Colors.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Text(model.family)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(model.reasoning ? Colors.purple : Colors.blue)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background((model.reasoning ? Colors.purple : Colors.blue).opacity(0.1), in: Capsule())
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    @ViewBuilder
-    private var trailingBadge: some View {
-        if isSelected {
-            Image(systemName: "checkmark")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 34, height: 34)
-                .background(Colors.blue, in: Circle())
-                .shadow(color: Colors.blue.opacity(0.22), radius: 6, y: 3)
-        } else {
-            HStack(spacing: 6) {
-                Image(systemName: model.downloaded ? "checkmark.circle" : "icloud.and.arrow.down")
-                    .font(.system(size: 15, weight: .semibold))
-                Text(model.downloaded ? "Ready" : model.size)
-                    .font(.system(size: 13, weight: .bold))
-            }
-            .foregroundStyle(Colors.blue)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 10)
-            .background(Colors.surfaceInset, in: Capsule())
-        }
-    }
-}
-
-struct DeviceStorageFooter: View {
-    var body: some View {
-        VStack(spacing: 14) {
-            HStack {
-                Label("Device Storage", systemImage: "externaldrive")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Colors.ink)
-                Spacer()
-                Text("14.8 GB free of 256 GB")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Colors.control)
-            }
-
-            GeometryReader { proxy in
-                HStack(spacing: 0) {
-                    Colors.blue.frame(width: proxy.size.width * 0.72)
-                    Colors.purple.frame(width: proxy.size.width * 0.14)
-                    Colors.border.frame(maxWidth: .infinity)
+    private var downloadButton: some View {
+        Group {
+            if isDownloading {
+                ZStack {
+                    Circle()
+                        .stroke(Colors.border, lineWidth: 3)
+                    if let downloadProgress {
+                        Circle()
+                            .trim(from: 0, to: downloadProgress)
+                            .stroke(Colors.blue, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    } else {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(Colors.blue)
+                    }
                 }
+                .frame(width: 38, height: 38)
+                .accessibilityLabel(downloadProgress.map { "Downloading \(Int($0 * 100)) percent" } ?? "Preparing download")
+            } else if isDownloaded {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Colors.blue)
+                    .frame(width: 40, height: 40)
+                    .background(Colors.surfaceInset, in: Circle())
+                    .overlay(Circle().stroke(Colors.blue.opacity(0.35), lineWidth: 1))
+                    .accessibilityLabel("Model downloaded")
+            } else {
+                Button(action: onDownload) {
+                    Image(systemName: "arrow.down.to.line")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Colors.control)
+                        .frame(width: 40, height: 40)
+                        .background(Colors.surfaceInset, in: Circle())
+                        .overlay(Circle().stroke(Colors.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(downloadError == nil ? "Download model" : "Retry model download")
             }
-            .frame(height: 8)
-            .clipShape(Capsule())
-
-            Button {} label: {
-                Label("Import Custom GGUF/CoreAI Model", systemImage: "plus.circle")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Colors.ink)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(Colors.surfaceInset, in: RoundedRectangle(cornerRadius: 18))
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Colors.border, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 15)
-        .padding(.bottom, 12)
-        .background(Colors.surface.opacity(0.97))
-        .overlay(alignment: .top) { Colors.border.frame(height: 1) }
     }
 }

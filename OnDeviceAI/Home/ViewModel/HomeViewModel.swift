@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 final class HomeViewModel {
     private var homeUI = HomeUI()
     var isAppleIntelligenceEnableAlertPresented = false
+    var isSelectedModelNotDownloadedAlertPresented = false
     private(set) var agentMode: AgentMode = .AppleIntelligence
     private(set) var elapsedTime: TimeInterval = 0
 
@@ -26,6 +27,7 @@ final class HomeViewModel {
     private let textProcessingProvider: TextProcessingProvider
     private let speechSynthesisProvider: SpeechSynthesisProvider
     private let imagePlaygroundProvider: ImagePlaygroundProvider
+    let modelDownloadManager = ModelDownloadManager()
     private var generationTask: Task<Void, Never>?
     private var elapsedTimerTask: Task<Void, Never>?
     private var activeGenerationID: UUID?
@@ -128,7 +130,12 @@ final class HomeViewModel {
             guard canRunAgent else {
                 return
             }
-            guard case .AppleIntelligence = agentMode else {
+            if case let .CoreAI(repositoryID) = agentMode {
+                guard modelDownloadManager.isDownloaded(repositoryID: repositoryID) else {
+                    isSelectedModelNotDownloadedAlertPresented = true
+                    return
+                }
+                homeUI.uiModel.errorMessage = "Core AI inference is not available in this app yet."
                 homeUI.viewState = .failed
                 return
             }
@@ -160,6 +167,12 @@ final class HomeViewModel {
                 )
             }
         }
+    }
+
+    func downloadSelectedModel() {
+        guard case let .CoreAI(repositoryID) = agentMode else { return }
+        let displayName = repositoryID.split(separator: "/").last.map(String.init) ?? repositoryID
+        modelDownloadManager.startDownload(repositoryID: repositoryID, displayName: displayName)
     }
 
     func failExecution() {
@@ -325,7 +338,7 @@ struct UIModel {
     var attachedFiles: [URL] = []
     var selectedMode = 0
     var modelName = "Apple Intelligence"
-    var customModelName = "GPT-4o"
+    var customModelName = "coreai-community/LFM2.5-1.2B-CoreAI"
     var completionDuration = "0s"
     var consumedTokenCount: Int?
     var errorMessage: String?

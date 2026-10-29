@@ -1,5 +1,5 @@
-import Observation
 import Foundation
+import Observation
 
 @MainActor
 @Observable
@@ -7,49 +7,57 @@ final class ModelPickerViewModel {
     private(set) var query = ""
     private(set) var selectedFilter: ModelPickerFilter = .all
     private(set) var selectedModel: String
+    private(set) var models: [AIModelOption] = []
+    private(set) var isLoading = false
+    private(set) var errorMessage: String?
 
-    let filters = ModelPickerFilter.allCases
+    private let catalog: CoreAIModelCatalogService
+    let downloadManager: ModelDownloadManager
 
-    private let models = [
-        AIModelOption(
-            name: "DeepSeek-R1 Distill 7B", family: "Reasoning", icon: "brain.head.profile",
-            source: "Local MLX • 128K ctx • 4.8 GB • INT4", detail: "Ready on device • Neural Engine + GPU",
-            size: "4.8 GB", downloaded: true, reasoning: true, small: false
-        ),
-        AIModelOption(
-            name: "Qwen 2.5 7B", family: "Instruct", icon: "brain.fill",
-            source: "Local GGUF Q4_K_M • 32K ctx • 4.4 GB", detail: "4-bit Quant • High Multilingual Accuracy",
-            size: "4.4 GB", downloaded: false, reasoning: false, small: false
-        ),
-        AIModelOption(
-            name: "Gemma 2 2B", family: "MLX", icon: "diamond.fill",
-            source: "Apple MLX • 8K ctx • 1.6 GB", detail: "Ultra-low RAM • 62 t/s on Apple Silicon",
-            size: "1.6 GB", downloaded: false, reasoning: false, small: true
-        ),
-        AIModelOption(
-            name: "Llama 3.2 3B", family: "Local", icon: "cpu.fill",
-            source: "Local MLX • 8K ctx • 2.0 GB", detail: "Fast responses • Optimized for mobile",
-            size: "2.0 GB", downloaded: false, reasoning: false, small: true
-        )
-    ]
-
-    init(selectedModel: String) {
-        let names = ["DeepSeek-R1 Distill 7B", "Qwen 2.5 7B", "Gemma 2 2B", "Llama 3.2 3B"]
-        self.selectedModel = names.contains(selectedModel) ? selectedModel : names[0]
+    init(
+        selectedModel: String,
+        downloadManager: ModelDownloadManager,
+        catalog: CoreAIModelCatalogService? = nil
+    ) {
+        self.selectedModel = selectedModel
+        self.downloadManager = downloadManager
+        self.catalog = catalog ?? CoreAIModelCatalogService()
     }
 
     var filteredModels: [AIModelOption] {
         models.filter { model in
             let matchesQuery = query.isEmpty ||
-                "\(model.name) \(model.family) \(model.source)".localizedCaseInsensitiveContains(query)
+                "\(model.name) \(model.repositoryID) \(model.task) \(model.license)"
+                    .localizedCaseInsensitiveContains(query)
             let matchesFilter: Bool
             switch selectedFilter {
             case .all: matchesFilter = true
-            case .downloaded: matchesFilter = model.downloaded
-            case .small: matchesFilter = model.small
-            case .reasoning: matchesFilter = model.reasoning
+            case .text: matchesFilter = model.category == .text
+            case .vision: matchesFilter = model.category == .vision
+            case .audio: matchesFilter = model.category == .audio
+            case .other: matchesFilter = model.category == .other
             }
             return matchesQuery && matchesFilter
+        }
+    }
+
+    func loadModels() async {
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let loadedModels = try await catalog.fetchModels()
+            models = loadedModels
+            if !loadedModels.contains(where: { $0.repositoryID == selectedModel }),
+               let firstModel = loadedModels.first {
+                selectedModel = firstModel.repositoryID
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -62,37 +70,30 @@ final class ModelPickerViewModel {
     }
 
     func selectModel(_ model: AIModelOption) {
-        selectedModel = model.name
+        selectedModel = model.repositoryID
+    }
+
+    func download(_ model: AIModelOption) {
+        downloadManager.startDownload(for: model)
     }
 }
 
 enum ModelPickerFilter: String, CaseIterable, Identifiable {
     case all
-    case downloaded
-    case small
-    case reasoning
+    case text
+    case vision
+    case audio
+    case other
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .all: return "All"
-        case .downloaded: return "Downloaded"
-        case .small: return "Small (<4B)"
-        case .reasoning: return "Reasoning"
+        case .all: "All"
+        case .text: "Text"
+        case .vision: "Vision"
+        case .audio: "Audio"
+        case .other: "Other"
         }
     }
-}
-
-struct AIModelOption: Identifiable {
-    var id: String { name }
-    let name: String
-    let family: String
-    let icon: String
-    let source: String
-    let detail: String
-    let size: String
-    let downloaded: Bool
-    let reasoning: Bool
-    let small: Bool
 }
