@@ -184,7 +184,30 @@ struct ModelOptionCard: View {
             }
             .buttonStyle(.plain)
 
-            downloadButton
+            VStack(spacing: 8) {
+                downloadButton
+                if let huggingFaceURL {
+                    Link(destination: huggingFaceURL) {
+                        ZStack(alignment: .topTrailing) {
+                            Text("🤗")
+                                .font(.system(size: 23))
+                                .frame(width: 30, height: 30)
+
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 15, height: 15)
+                                .background(Colors.blue, in: Circle())
+                                .overlay {
+                                    Circle().stroke(Colors.surface, lineWidth: 1.5)
+                                }
+                                .offset(x: 3, y: -3)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open \(model.repositoryID) on Hugging Face")
+                }
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -256,5 +279,13 @@ struct ModelOptionCard: View {
                 .accessibilityLabel(downloadError == nil ? "Download model" : "Retry model download")
             }
         }
+    }
+
+    private var huggingFaceURL: URL? {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "huggingface.co"
+        components.path = "/\(model.repositoryID)"
+        return components.url
     }
 }
