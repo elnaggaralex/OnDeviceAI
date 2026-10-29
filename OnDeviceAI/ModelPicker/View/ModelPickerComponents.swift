@@ -151,17 +151,8 @@ struct ModelOptionCard: View {
                     modelIcon
 
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .top, spacing: 10) {
-                            title
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            if isSelected {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 28, height: 28)
-                                    .background(Colors.blue, in: Circle())
-                            }
-                        }
+                        title
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
                         Text(model.repositoryID)
                             .font(.system(size: 12, weight: .medium))
