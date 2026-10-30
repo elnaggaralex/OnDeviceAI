@@ -24,6 +24,14 @@ final class ModelDownloadManager {
         return true
     }
 
+    func languageModelBundleURL(repositoryID: String) -> URL? {
+        downloader.languageModelBundleURL(repositoryID: repositoryID)
+    }
+
+    func audio8ModelDirectoryURL(repositoryID: String) -> URL? {
+        downloader.audio8ModelDirectoryURL(repositoryID: repositoryID)
+    }
+
     func download(for repositoryID: String) -> ModelDownloadStatus? {
         activeDownloads.first { $0.repositoryID == repositoryID }
     }

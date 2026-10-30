@@ -20,6 +20,48 @@ struct HuggingFaceModelDownloader {
         return true
     }
 
+    func languageModelBundleURL(repositoryID: String) -> URL? {
+        guard isDownloaded(repositoryID: repositoryID),
+              let manifest = try? readManifest(repositoryID: repositoryID),
+              let modelPath = manifest.files.first(where: { $0.lowercased().hasSuffix(".aimodel") }) else {
+            return nil
+        }
+
+        let modelURL = installedDirectory(repositoryID: repositoryID).appending(path: modelPath)
+        let bundleURL = modelURL.deletingLastPathComponent()
+        var isDirectory: ObjCBool = false
+        let hasTokenizer = fileManager.fileExists(
+            atPath: bundleURL.appendingPathComponent("tokenizer", isDirectory: true).path,
+            isDirectory: &isDirectory
+        ) && isDirectory.boolValue
+
+        guard fileManager.fileExists(atPath: modelURL.path),
+              fileManager.fileExists(atPath: bundleURL.appendingPathComponent("metadata.json").path),
+              hasTokenizer else {
+            return nil
+        }
+        return bundleURL
+    }
+
+    func audio8ModelDirectoryURL(repositoryID: String) -> URL? {
+        guard isDownloaded(repositoryID: repositoryID) else { return nil }
+        let modelDirectory = installedDirectory(repositoryID: repositoryID)
+        let requiredAssets = [
+            "audio8_dualar_int8_cl2048_w32.aimodel",
+            "audio8_codec_decoder_fp16_t160.aimodel"
+        ]
+        let tokenizerURL = modelDirectory.appendingPathComponent("tokenizer", isDirectory: true)
+        var isTokenizerDirectory: ObjCBool = false
+        guard requiredAssets.allSatisfy({
+            fileManager.fileExists(atPath: modelDirectory.appendingPathComponent($0).path)
+        }),
+              fileManager.fileExists(atPath: tokenizerURL.path, isDirectory: &isTokenizerDirectory),
+              isTokenizerDirectory.boolValue else {
+            return nil
+        }
+        return modelDirectory
+    }
+
     func installedRepositoryIDs() -> Set<String> {
         guard let directories = try? fileManager.contentsOfDirectory(
             at: storageRoot,
@@ -48,7 +90,8 @@ struct HuggingFaceModelDownloader {
         if isDownloaded(repositoryID: repositoryID) { return }
 
         let metadata = try await fetchRepositoryMetadata(repositoryID: repositoryID)
-        guard !metadata.files.isEmpty else { throw ModelDownloadError.emptyRepository }
+        let filesToDownload = try selectedFiles(from: metadata.files, repositoryID: repositoryID)
+        guard !filesToDownload.isEmpty else { throw ModelDownloadError.emptyRepository }
 
         try fileManager.createDirectory(at: storageRoot, withIntermediateDirectories: true)
         let stagingDirectory = storageRoot.appendingPathComponent(
@@ -58,11 +101,11 @@ struct HuggingFaceModelDownloader {
         try fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: stagingDirectory) }
 
-        let expectedTotal = metadata.files.reduce(Int64.zero) { $0 + max(0, $1.size ?? 0) }
+        let expectedTotal = filesToDownload.reduce(Int64.zero) { $0 + max(0, $1.size ?? 0) }
         var completedBytes: Int64 = 0
         var completedFiles = 0
 
-        for file in metadata.files {
+        for file in filesToDownload {
             try Task.checkCancellation()
             let destination = try fileURL(for: file.path, inside: stagingDirectory)
             try fileManager.createDirectory(
@@ -73,7 +116,7 @@ struct HuggingFaceModelDownloader {
             let baseBytes = completedBytes
             let fileSize = max(0, file.size ?? 0)
             let baseFileCount = completedFiles
-            let totalFileCount = metadata.files.count
+            let totalFileCount = filesToDownload.count
             let fileProgress: @MainActor @Sendable (Int64, Int64) -> Void = { written, responseExpected in
                 let expected = fileSize > 0 ? fileSize : max(0, responseExpected)
                 let fileFraction = expected > 0
@@ -100,7 +143,7 @@ struct HuggingFaceModelDownloader {
             completedFiles += 1
             let overall = expectedTotal > 0
                 ? min(1, Double(completedBytes) / Double(expectedTotal))
-                : Double(completedFiles) / Double(metadata.files.count)
+                : Double(completedFiles) / Double(filesToDownload.count)
             await progress(overall)
         }
 
@@ -108,7 +151,7 @@ struct HuggingFaceModelDownloader {
             repositoryID: repositoryID,
             displayName: displayName,
             revision: metadata.revision,
-            files: metadata.files.map(\.path),
+            files: filesToDownload.map(\.path),
             installedAt: Date()
         )
         let manifestData = try JSONEncoder().encode(manifest)
@@ -145,6 +188,30 @@ struct HuggingFaceModelDownloader {
             return HubRepositoryFile(path: path, size: file.size ?? file.lfs?.size)
         }
         return HubRepositoryMetadata(revision: revision, files: files)
+    }
+
+    private func selectedFiles(
+        from files: [HubRepositoryFile],
+        repositoryID: String
+    ) throws -> [HubRepositoryFile] {
+        guard repositoryID.caseInsensitiveCompare("coreai-community/Audio8-TTS-Preview-0.6b-CoreAI") == .orderedSame else {
+            return files
+        }
+
+        let requiredPaths = [
+            "audio8_dualar_int8_cl2048_w32.aimodel",
+            "audio8_codec_decoder_fp16_t160.aimodel",
+            "tokenizer"
+        ]
+        let containsPath = { (prefix: String) in
+            files.contains { $0.path == prefix || $0.path.hasPrefix(prefix + "/") }
+        }
+        guard requiredPaths.allSatisfy(containsPath) else {
+            throw ModelDownloadError.missingRequiredAssets
+        }
+        return files.filter { file in
+            requiredPaths.contains { file.path == $0 || file.path.hasPrefix($0 + "/") }
+        }
     }
 
     private func fileURL(repositoryID: String, revision: String, filename: String) throws -> URL {
@@ -249,6 +316,7 @@ private enum ModelDownloadError: LocalizedError {
     case invalidResponse
     case httpStatus(Int)
     case missingRevision
+    case missingRequiredAssets
     case invalidFileURL(String)
     case invalidFilePath(String)
 
@@ -264,6 +332,8 @@ private enum ModelDownloadError: LocalizedError {
             "Hugging Face could not provide this model (HTTP \(status))."
         case .missingRevision:
             "Hugging Face did not provide a revision for this model."
+        case .missingRequiredAssets:
+            "This Audio8-TTS repository is missing the model, codec, or tokenizer files required for speech generation."
         case .invalidFileURL(let filename):
             "Couldn’t create a download URL for \(filename)."
         case .invalidFilePath(let path):

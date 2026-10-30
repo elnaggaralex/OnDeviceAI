@@ -23,8 +23,13 @@ final class HomeViewModel {
                     || type?.conforms(to: .audio) == true
             }
     }
+    var isTextToSpeechModel: Bool {
+        homeUI.uiModel.customModelCategory == .audio
+            && homeUI.uiModel.customModelTask.localizedCaseInsensitiveContains("text to speech")
+    }
     
     private let textProcessingProvider: TextProcessingProvider
+    private let audioToSpeechProvider = AudioToSpeechProvider()
     private let speechSynthesisProvider: SpeechSynthesisProvider
     private let imagePlaygroundProvider: ImagePlaygroundProvider
     let modelDownloadManager = ModelDownloadManager()
@@ -108,8 +113,14 @@ final class HomeViewModel {
         refreshExecutedStateIfNeeded()
     }
 
-    func selectCustomModel(_ modelName: String) {
+    func selectCustomModel(
+        _ modelName: String,
+        category: AIModelCategory = .text,
+        task: String = "Text Generation"
+    ) {
         homeUI.uiModel.customModelName = modelName
+        homeUI.uiModel.customModelCategory = category
+        homeUI.uiModel.customModelTask = task
         if homeUI.uiModel.selectedMode != 0 {
             homeUI.uiModel.modelName = modelName
             agentMode = .CoreAI(model: modelName)
@@ -130,19 +141,60 @@ final class HomeViewModel {
             guard canRunAgent else {
                 return
             }
+            var modelBundleURL: URL?
+            var audio8ModelDirectoryURL: URL?
             if case let .CoreAI(repositoryID) = agentMode {
                 guard modelDownloadManager.isDownloaded(repositoryID: repositoryID) else {
                     isSelectedModelNotDownloadedAlertPresented = true
                     return
                 }
-                homeUI.uiModel.errorMessage = "Core AI inference is not available in this app yet."
-                homeUI.viewState = .failed
-                return
+                if isTextToSpeechModel {
+                    guard AudioToSpeechProvider.supports(repositoryID: repositoryID) else {
+                        homeUI.uiModel.errorMessage = "This app currently supports Audio8-TTS for custom text-to-speech models."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    guard homeUI.uiModel.attachedFiles.isEmpty else {
+                        homeUI.uiModel.errorMessage = "Audio8-TTS currently accepts text only. Remove the attached files and enter the words to speak."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    guard let modelDirectoryURL = modelDownloadManager.audio8ModelDirectoryURL(repositoryID: repositoryID) else {
+                        homeUI.uiModel.errorMessage = "The downloaded model is missing Audio8-TTS assets. It needs the DualAR model, codec decoder, and tokenizer."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    audio8ModelDirectoryURL = modelDirectoryURL
+                } else {
+                    guard homeUI.uiModel.customModelCategory == .text,
+                          homeUI.uiModel.customModelTask.localizedCaseInsensitiveContains("generation") else {
+                        homeUI.uiModel.errorMessage = "The selected model does not support a task available in this app. Choose a text-generation or supported text-to-speech model."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    guard !homeUI.uiModel.attachedFiles.contains(where: {
+                        fileType(for: $0)?.conforms(to: .image) == true
+                            || fileType(for: $0)?.conforms(to: .audio) == true
+                    }) else {
+                        homeUI.uiModel.errorMessage = "This Core AI model supports text prompts and text files only. Remove the attached image or audio file, or switch to Apple Intelligence."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    guard let bundleURL = modelDownloadManager.languageModelBundleURL(repositoryID: repositoryID) else {
+                        homeUI.uiModel.errorMessage = "The downloaded repository is missing a Core AI language-model bundle (.aimodel, tokenizer, and metadata)."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    modelBundleURL = bundleURL
+                }
             }
             homeUI.uiModel.structuredResponse = nil
             homeUI.uiModel.errorMessage = nil
             homeUI.uiModel.consumedTokenCount = nil
             homeUI.uiModel.speechText = nil
+            homeUI.uiModel.speechStyle = nil
+            homeUI.uiModel.speechGender = nil
+            homeUI.uiModel.isGeneratedAudioReady = false
             homeUI.uiModel.speechPlaybackState = .idle
             homeUI.uiModel.generatedImageURL = nil
             homeUI.uiModel.imageGenerationRequest = nil
@@ -159,12 +211,22 @@ final class HomeViewModel {
             let prompt = homeUI.uiModel.prompt
             let attachedFiles = homeUI.uiModel.attachedFiles
             generationTask = Task {
-                await generateText(
-                    prompt: prompt,
-                    attachedFiles: attachedFiles,
-                    startedAt: startTime,
-                    generationID: generationID
-                )
+                if let audio8ModelDirectoryURL {
+                    await generateSpeech(
+                        text: prompt,
+                        modelDirectoryURL: audio8ModelDirectoryURL,
+                        startedAt: startTime,
+                        generationID: generationID
+                    )
+                } else {
+                    await generateText(
+                        prompt: prompt,
+                        attachedFiles: attachedFiles,
+                        modelBundleURL: modelBundleURL,
+                        startedAt: startTime,
+                        generationID: generationID
+                    )
+                }
             }
         }
     }
@@ -186,6 +248,10 @@ final class HomeViewModel {
         case .paused:
             speechSynthesisProvider.resume()
         case .idle:
+            if homeUI.uiModel.isGeneratedAudioReady {
+                speechSynthesisProvider.playGeneratedAudio()
+                return
+            }
             guard let speechText = homeUI.uiModel.speechText,
                   let speechStyle = homeUI.uiModel.speechStyle,
                   !speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -213,6 +279,7 @@ final class HomeViewModel {
     private func generateText(
         prompt: String,
         attachedFiles: [URL],
+        modelBundleURL: URL?,
         startedAt startTime: Date,
         generationID: UUID
     ) async {
@@ -224,6 +291,11 @@ final class HomeViewModel {
             }
         }
         do {
+            defer {
+                if modelBundleURL != nil {
+                    textProcessingProvider.finishCustomModelRun()
+                }
+            }
             let audioURLs = attachedFiles.filter { fileType(for: $0)?.conforms(to: .audio) == true }
             let accessedAudioURLs = audioURLs.filter { $0.startAccessingSecurityScopedResource() }
             defer {
@@ -262,15 +334,21 @@ final class HomeViewModel {
                 }
             }
 
-            let responseStream = imageURLs.isEmpty && audioURLs.isEmpty
-                ? textProcessingProvider.streamResponse(to: modelPrompt)
-                : MediaProcessingProvider(
+            let responseStream: LanguageModelSession.ResponseStream<TextTaskResult>
+            if imageURLs.isEmpty && audioURLs.isEmpty {
+                responseStream = try await textProcessingProvider.streamResponse(
+                    to: modelPrompt,
+                    languageModelBundleURL: modelBundleURL
+                )
+            } else {
+                responseStream = MediaProcessingProvider(
                     imageURLs: imageURLs,
                     audioURLs: audioURLs,
                     speechSynthesisProvider: speechSynthesisProvider,
                     imagePlaygroundProvider: imagePlaygroundProvider
                 )
                     .streamResponse(to: modelPrompt)
+            }
 
             for try await snapshot in responseStream {
                 try Task.checkCancellation()
@@ -280,6 +358,47 @@ final class HomeViewModel {
             }
 
             guard activeGenerationID == generationID else { return }
+            homeUI.uiModel.completionDuration = String(format: "%.1fs", Date().timeIntervalSince(startTime))
+            homeUI.viewState = .executed(homeUI.uiModel)
+        } catch is CancellationError {
+            if activeGenerationID == generationID {
+                homeUI.viewState = .executed(homeUI.uiModel)
+            }
+        } catch {
+            if activeGenerationID == generationID {
+                homeUI.uiModel.errorMessage = error.localizedDescription
+                homeUI.viewState = .failed
+            }
+        }
+    }
+
+    private func generateSpeech(
+        text: String,
+        modelDirectoryURL: URL,
+        startedAt startTime: Date,
+        generationID: UUID
+    ) async {
+        defer {
+            if activeGenerationID == generationID {
+                activeGenerationID = nil
+                stopElapsedTimer()
+                generationTask = nil
+            }
+        }
+
+        do {
+            let samples = try await audioToSpeechProvider.synthesize(
+                text: text,
+                modelDirectoryURL: modelDirectoryURL
+            )
+            try Task.checkCancellation()
+            guard activeGenerationID == generationID else { return }
+            try speechSynthesisProvider.loadGeneratedAudio(
+                samples: samples,
+                sampleRate: AudioToSpeechProvider.sampleRate
+            )
+            homeUI.uiModel.speechText = text
+            homeUI.uiModel.isGeneratedAudioReady = true
             homeUI.uiModel.completionDuration = String(format: "%.1fs", Date().timeIntervalSince(startTime))
             homeUI.viewState = .executed(homeUI.uiModel)
         } catch is CancellationError {
@@ -339,11 +458,14 @@ struct UIModel {
     var selectedMode = 0
     var modelName = "Apple Intelligence"
     var customModelName = "coreai-community/LFM2.5-1.2B-CoreAI"
+    var customModelCategory: AIModelCategory = .text
+    var customModelTask = "Text Generation"
     var completionDuration = "0s"
     var consumedTokenCount: Int?
     var errorMessage: String?
     var structuredResponse: TextTaskResult.PartiallyGenerated?
     var speechText: String?
+    var isGeneratedAudioReady = false
     var speechStyle: RequestedSpeechStyle?
     var speechGender: RequestedSpeechGender?
     var speechLanguageCode = "en-US"

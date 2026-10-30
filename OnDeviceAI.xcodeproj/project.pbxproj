@@ -6,6 +6,11 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* CoreAILM in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000003 /* CoreAILM */; };
+		A10000000000000000000006 /* CoreAIKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000005 /* CoreAIKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* OnDeviceAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OnDeviceAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -22,6 +27,8 @@
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				A10000000000000000000001 /* CoreAILM in Frameworks */,
+				A10000000000000000000006 /* CoreAIKit in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -60,6 +67,10 @@
 				000000000000000000000010 /* OnDeviceAI */,
 			);
 			name = OnDeviceAI;
+			packageProductDependencies = (
+				A10000000000000000000003 /* CoreAILM */,
+				A10000000000000000000005 /* CoreAIKit */,
+			);
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* OnDeviceAI.app */;
 			productType = "com.apple.product-type.application";
@@ -88,6 +99,10 @@
 			);
 			mainGroup = 000000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A10000000000000000000002 /* XCRemoteSwiftPackageReference "coreai-models" */,
+				A10000000000000000000004 /* XCRemoteSwiftPackageReference "coreai-kit" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
 			projectDirPath = "";
@@ -345,6 +360,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A10000000000000000000002 /* XCRemoteSwiftPackageReference "coreai-models" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/john-rocky/coreai-models";
+			requirement = {
+				kind = exactVersion;
+				version = "0.2.8-zoo";
+			};
+		};
+		A10000000000000000000004 /* XCRemoteSwiftPackageReference "coreai-kit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/john-rocky/coreai-kit";
+			requirement = {
+				kind = revision;
+				revision = b13f54a7299bf789c0645a918f4f1780914bc96c;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A10000000000000000000003 /* CoreAILM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000002 /* XCRemoteSwiftPackageReference "coreai-models" */;
+			productName = CoreAILM;
+		};
+		A10000000000000000000005 /* CoreAIKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000004 /* XCRemoteSwiftPackageReference "coreai-kit" */;
+			productName = CoreAIKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 000000000000000000000000 /* Project object */;
 }

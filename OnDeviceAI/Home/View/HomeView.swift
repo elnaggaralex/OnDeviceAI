@@ -55,7 +55,8 @@ struct HomeView: View {
                     PromptCardView(
                         prompt: promptBinding,
                         attachedFiles: attachedFilesBinding,
-                        consumedTokenCount: viewModel.uiModel.consumedTokenCount
+                        consumedTokenCount: viewModel.uiModel.consumedTokenCount,
+                        isTextToSpeech: viewModel.uiModel.selectedMode != 0 && viewModel.isTextToSpeechModel
                     )
                     RunAgentButton(isRunning: isExecuting) {
                         viewModel.toggleExecutionState()
@@ -110,8 +111,8 @@ struct HomeView: View {
             ModelPickerSheet(
                 selectedModel: viewModel.uiModel.customModelName,
                 downloadManager: viewModel.modelDownloadManager
-            ) { model in
-                viewModel.selectCustomModel(model)
+            ) { model, category, task in
+                viewModel.selectCustomModel(model, category: category, task: task)
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)

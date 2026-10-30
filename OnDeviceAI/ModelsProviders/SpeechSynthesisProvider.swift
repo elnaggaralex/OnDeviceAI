@@ -11,6 +11,8 @@ enum SpeechPlaybackState: Equatable, Sendable {
 final class SpeechSynthesisProvider: NSObject {
     private let synthesizer = AVSpeechSynthesizer()
     private var activeUtterance: AVSpeechUtterance?
+    private var generatedAudioPlayer: AVAudioPlayer?
+    private var generatedAudioData: Data?
     private var didHandleSpeechToolRequest = false
     var onPlaybackStateChange: ((SpeechPlaybackState) -> Void)?
     var onSpeechRequest: ((String, RequestedSpeechStyle, RequestedSpeechGender, String) -> Void)?
@@ -57,6 +59,28 @@ final class SpeechSynthesisProvider: NSObject {
 
     func prepareForNewRequest() {
         didHandleSpeechToolRequest = false
+        generatedAudioPlayer?.stop()
+        generatedAudioPlayer = nil
+        generatedAudioData = nil
+    }
+
+    func loadGeneratedAudio(samples: [Float], sampleRate: Int) throws {
+        stop()
+        let data = Self.wavData(samples: samples, sampleRate: sampleRate)
+        let player = try AVAudioPlayer(data: data)
+        player.delegate = self
+        guard player.prepareToPlay() else {
+            throw GeneratedAudioPlaybackError.couldNotPrepare
+        }
+        generatedAudioData = data
+        generatedAudioPlayer = player
+    }
+
+    func playGeneratedAudio() {
+        guard let generatedAudioPlayer else { return }
+        generatedAudioPlayer.currentTime = 0
+        generatedAudioPlayer.play()
+        onPlaybackStateChange?(.speaking)
     }
 
     func speakFromTool(
@@ -98,11 +122,21 @@ final class SpeechSynthesisProvider: NSObject {
     }
 
     func pause() {
+        if let generatedAudioPlayer {
+            generatedAudioPlayer.pause()
+            onPlaybackStateChange?(.paused)
+            return
+        }
         guard synthesizer.pauseSpeaking(at: .word) else { return }
         onPlaybackStateChange?(.paused)
     }
 
     func resume() {
+        if let generatedAudioPlayer {
+            generatedAudioPlayer.play()
+            onPlaybackStateChange?(.speaking)
+            return
+        }
         guard synthesizer.continueSpeaking() else { return }
         onPlaybackStateChange?(.speaking)
     }
@@ -113,7 +147,43 @@ final class SpeechSynthesisProvider: NSObject {
         if wasActive {
             synthesizer.stopSpeaking(at: .immediate)
         }
+        generatedAudioPlayer?.stop()
+        generatedAudioPlayer?.currentTime = 0
         onPlaybackStateChange?(.idle)
+    }
+
+    private func updateGeneratedPlaybackState(
+        _ state: SpeechPlaybackState,
+        playerIdentifier: ObjectIdentifier
+    ) {
+        guard let generatedAudioPlayer,
+              ObjectIdentifier(generatedAudioPlayer) == playerIdentifier else { return }
+        onPlaybackStateChange?(state)
+    }
+
+    private static func wavData(samples: [Float], sampleRate: Int) -> Data {
+        var pcmData = Data(capacity: samples.count * MemoryLayout<Int16>.size)
+        for sample in samples {
+            let clamped = max(-1, min(1, sample))
+            let pcmSample = Int16((clamped * Float(Int16.max)).rounded())
+            pcmData.appendLittleEndian(pcmSample)
+        }
+
+        var wav = Data()
+        wav.append(contentsOf: [82, 73, 70, 70]) // RIFF
+        wav.appendLittleEndian(UInt32(36 + pcmData.count))
+        wav.append(contentsOf: [87, 65, 86, 69, 102, 109, 116, 32]) // WAVE fmt
+        wav.appendLittleEndian(UInt32(16))
+        wav.appendLittleEndian(UInt16(1))
+        wav.appendLittleEndian(UInt16(1))
+        wav.appendLittleEndian(UInt32(sampleRate))
+        wav.appendLittleEndian(UInt32(sampleRate * MemoryLayout<Int16>.size))
+        wav.appendLittleEndian(UInt16(MemoryLayout<Int16>.size))
+        wav.appendLittleEndian(UInt16(16))
+        wav.append(contentsOf: [100, 97, 116, 97]) // data
+        wav.appendLittleEndian(UInt32(pcmData.count))
+        wav.append(pcmData)
+        return wav
     }
 
     private func updatePlaybackState(_ state: SpeechPlaybackState, utteranceIdentifier: ObjectIdentifier) {
@@ -122,6 +192,30 @@ final class SpeechSynthesisProvider: NSObject {
             self.activeUtterance = nil
         }
         onPlaybackStateChange?(state)
+    }
+}
+
+extension SpeechSynthesisProvider: AVAudioPlayerDelegate {
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        let playerIdentifier = ObjectIdentifier(player)
+        Task { @MainActor [weak self] in
+            self?.updateGeneratedPlaybackState(.idle, playerIdentifier: playerIdentifier)
+        }
+    }
+}
+
+private enum GeneratedAudioPlaybackError: LocalizedError {
+    case couldNotPrepare
+
+    var errorDescription: String? {
+        "The generated audio could not be prepared for playback."
+    }
+}
+
+private extension Data {
+    mutating func appendLittleEndian<Value: FixedWidthInteger>(_ value: Value) {
+        var littleEndianValue = value.littleEndian
+        Swift.withUnsafeBytes(of: &littleEndianValue) { append(contentsOf: $0) }
     }
 }
 

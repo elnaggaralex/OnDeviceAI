@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ModelPickerSheet: View {
-    private let onDone: (String) -> Void
+    private let onDone: (String, AIModelCategory, String) -> Void
     private let downloadManager: ModelDownloadManager
     @State private var viewModel: ModelPickerViewModel
     @Environment(\.dismiss) private var dismiss
@@ -9,7 +9,7 @@ struct ModelPickerSheet: View {
     init(
         selectedModel: String,
         downloadManager: ModelDownloadManager,
-        onDone: @escaping (String) -> Void
+        onDone: @escaping (String, AIModelCategory, String) -> Void
     ) {
         self.onDone = onDone
         self.downloadManager = downloadManager
@@ -32,7 +32,8 @@ struct ModelPickerSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             ModelPickerHeaderView {
-                onDone(viewModel.selectedModel)
+                let selectedModel = viewModel.models.first { $0.repositoryID == viewModel.selectedModel }
+                onDone(viewModel.selectedModel, selectedModel?.category ?? .other, selectedModel?.task ?? "")
                 dismiss()
             }
 

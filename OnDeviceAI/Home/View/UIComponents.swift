@@ -111,12 +111,6 @@ private struct CustomModelSelectionView: View {
                         .foregroundStyle(Colors.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    Text("v2")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Colors.muted)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(Colors.surfaceInset, in: RoundedRectangle(cornerRadius: 5))
                 }
                 Text("Context: 200k • Fast Multi-step\nReasoning")
                     .font(.system(size: 12))
@@ -140,6 +134,7 @@ struct PromptCardView: View {
     @Binding var prompt: String
     @Binding var attachedFiles: [URL]
     let consumedTokenCount: Int?
+    var isTextToSpeech = false
     @State private var isAttachmentPickerPresented = false
     @State private var isPhotoPickerPresented = false
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
@@ -150,7 +145,7 @@ struct PromptCardView: View {
                 Image(systemName: "brain.head.profile")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Colors.purple)
-                Text("PROMPT")
+                Text(isTextToSpeech ? "TEXT TO SPEAK" : "PROMPT")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Colors.label)
                 Spacer()
@@ -164,7 +159,11 @@ struct PromptCardView: View {
 
             SeparatorView()
 
-            TextField("Write a prompt…", text: $prompt, axis: .vertical)
+            TextField(
+                isTextToSpeech ? "Enter the words you want spoken…" : "Write a prompt…",
+                text: $prompt,
+                axis: .vertical
+            )
                 .font(.system(size: 15))
                 .foregroundStyle(Colors.ink)
                 .lineSpacing(5)
@@ -187,6 +186,23 @@ struct PromptCardView: View {
 
             SeparatorView()
 
+            if isTextToSpeech {
+                HStack {
+                    Text("Enter only the text you want spoken.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Colors.muted)
+                    Spacer(minLength: 4)
+                    Button("Clear") { prompt = "" }
+                        .font(.system(size: 12))
+                        .foregroundStyle(Colors.muted)
+                    Text("\(consumedTokenCount.map(String.init) ?? "—") tokens")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Colors.control)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(Colors.surfacePill, in: Capsule())
+                }
+            } else {
             HStack {
                 Button {} label: {
                     Image(systemName: "mic")
@@ -256,6 +272,7 @@ struct PromptCardView: View {
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
                     .background(Colors.surfacePill, in: Capsule())
+            }
             }
         }
         .padding(16)
