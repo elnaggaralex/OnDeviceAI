@@ -2,7 +2,7 @@ import CoreAIKit
 import Foundation
 
 @MainActor
-final class AudioToSpeechProvider {
+final class TextToSpeechProvider {
     static let sampleRate = 44_100
 
     static func supports(repositoryID: String) -> Bool {

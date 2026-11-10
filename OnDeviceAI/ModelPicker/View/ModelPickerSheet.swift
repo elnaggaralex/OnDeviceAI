@@ -70,6 +70,8 @@ struct ModelPickerSheet: View {
                             model: model,
                             isSelected: viewModel.selectedModel == model.repositoryID,
                             isDownloaded: downloadManager.isDownloaded(repositoryID: model.repositoryID),
+                            downloadSize: viewModel.downloadSize(for: model),
+                            isDownloadSizeUnavailable: viewModel.downloadSizeUnavailable(for: model),
                             isDownloading: download != nil,
                             downloadProgress: download?.progress,
                             downloadError: downloadManager.error(for: model.repositoryID),
@@ -80,6 +82,9 @@ struct ModelPickerSheet: View {
                             },
                             onDownload: { viewModel.download(model) }
                         )
+                        .task(id: model.repositoryID) {
+                            await viewModel.loadDownloadSize(for: model)
+                        }
                     }
 
                     if !viewModel.isLoading, viewModel.errorMessage == nil, viewModel.filteredModels.isEmpty {

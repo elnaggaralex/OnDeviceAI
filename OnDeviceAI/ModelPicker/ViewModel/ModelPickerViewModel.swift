@@ -10,6 +10,9 @@ final class ModelPickerViewModel {
     private(set) var models: [AIModelOption] = []
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    private(set) var downloadSizes: [String: Int64] = [:]
+    private var sizeLookupsInProgress: Set<String> = []
+    private(set) var unavailableDownloadSizes: Set<String> = []
 
     private let catalog: CoreAIModelCatalogService
     let downloadManager: ModelDownloadManager
@@ -38,6 +41,42 @@ final class ModelPickerViewModel {
             case .other: matchesFilter = model.category == .other
             }
             return matchesQuery && matchesFilter
+        }.sorted { lhs, rhs in
+            let lhsPriority = listPriority(for: lhs)
+            let rhsPriority = listPriority(for: rhs)
+            if lhsPriority != rhsPriority { return lhsPriority < rhsPriority }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private func listPriority(for model: AIModelOption) -> Int {
+        if downloadManager.isDownloaded(repositoryID: model.repositoryID) { return 0 }
+        if downloadManager.download(for: model.repositoryID) != nil { return 1 }
+        return 2
+    }
+
+    func downloadSize(for model: AIModelOption) -> Int64? {
+        downloadSizes[model.repositoryID]
+    }
+
+    func downloadSizeUnavailable(for model: AIModelOption) -> Bool {
+        unavailableDownloadSizes.contains(model.repositoryID)
+    }
+
+    func loadDownloadSize(for model: AIModelOption) async {
+        let repositoryID = model.repositoryID
+        guard downloadSizes[repositoryID] == nil,
+              sizeLookupsInProgress.insert(repositoryID).inserted else {
+            return
+        }
+        defer { sizeLookupsInProgress.remove(repositoryID) }
+
+        do {
+            downloadSizes[repositoryID] = try await downloadManager.downloadSize(repositoryID: repositoryID)
+        } catch is CancellationError {
+            return
+        } catch {
+            unavailableDownloadSizes.insert(repositoryID)
         }
     }
 

@@ -134,6 +134,7 @@ struct PromptCardView: View {
     @Binding var prompt: String
     @Binding var attachedFiles: [URL]
     let consumedTokenCount: Int?
+    let isTokenCountEstimated: Bool
     var isTextToSpeech = false
     @State private var isAttachmentPickerPresented = false
     @State private var isPhotoPickerPresented = false
@@ -195,7 +196,7 @@ struct PromptCardView: View {
                     Button("Clear") { prompt = "" }
                         .font(.system(size: 12))
                         .foregroundStyle(Colors.muted)
-                    Text("\(consumedTokenCount.map(String.init) ?? "—") tokens")
+                    Text(tokenCountLabel)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Colors.control)
                         .padding(.horizontal, 9)
@@ -266,7 +267,7 @@ struct PromptCardView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Colors.muted)
                     .padding(.trailing, 4)
-                Text("\(consumedTokenCount.map(String.init) ?? "—") tokens")
+                Text(tokenCountLabel)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Colors.control)
                     .padding(.horizontal, 9)
@@ -278,6 +279,11 @@ struct PromptCardView: View {
         .padding(16)
         .background(Colors.surface, in: RoundedRectangle(cornerRadius: 21))
         .overlay(RoundedRectangle(cornerRadius: 21).stroke(Colors.border, lineWidth: 1))
+    }
+
+    private var tokenCountLabel: String {
+        let count = consumedTokenCount.map(String.init) ?? "—"
+        return "\(isTokenCountEstimated ? "≈" : "")\(count) tokens"
     }
 
     @MainActor
@@ -444,6 +450,7 @@ struct CompletedResultCard: View {
             CompletedStatusHeader(viewState: viewState, model: model, elapsedTime: elapsedTime)
             ModelResponseView(
                 response: model.structuredResponse,
+                plainTextResponse: model.plainTextResponse,
                 errorMessage: model.errorMessage,
                 speechText: model.speechText,
                 speechStyle: model.speechStyle,
@@ -529,6 +536,7 @@ struct CompletedStatusHeader: View {
 
 struct ModelResponseView: View {
     let response: TextTaskResult.PartiallyGenerated?
+    let plainTextResponse: String?
     let errorMessage: String?
     let speechText: String?
     let speechStyle: RequestedSpeechStyle?
@@ -545,7 +553,7 @@ struct ModelResponseView: View {
                 Image(systemName: generatedImageURL != nil ? "photo" : (speechText == nil ? "text.bubble" : "waveform"))
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Colors.blue)
-                Text(generatedImageURL != nil ? "Generated Image" : (speechText == nil ? "Model Response" : "Generated Speech"))
+                Text(generatedImageURL != nil ? "Generated Image" : (plainTextResponse != nil ? "OCR Result" : (speechText == nil ? "Model Response" : "Generated Speech")))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Colors.blue)
                 Spacer()
@@ -581,6 +589,13 @@ struct ModelResponseView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
+            } else if let plainTextResponse {
+                Text(plainTextResponse)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Colors.ink)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
             } else if let speechText {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {

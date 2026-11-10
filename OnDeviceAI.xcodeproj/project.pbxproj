@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* CoreAILM in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000003 /* CoreAILM */; };
 		A10000000000000000000006 /* CoreAIKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000005 /* CoreAIKit */; };
+		A10000000000000000000007 /* CoreAIDiffusion in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000008 /* CoreAIDiffusion */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +30,7 @@
 			files = (
 				A10000000000000000000001 /* CoreAILM in Frameworks */,
 				A10000000000000000000006 /* CoreAIKit in Frameworks */,
+				A10000000000000000000007 /* CoreAIDiffusion in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -70,6 +72,7 @@
 			packageProductDependencies = (
 				A10000000000000000000003 /* CoreAILM */,
 				A10000000000000000000005 /* CoreAIKit */,
+				A10000000000000000000008 /* CoreAIDiffusion */,
 			);
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* OnDeviceAI.app */;
@@ -390,6 +393,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000004 /* XCRemoteSwiftPackageReference "coreai-kit" */;
 			productName = CoreAIKit;
+		};
+		A10000000000000000000008 /* CoreAIDiffusion */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000002 /* XCRemoteSwiftPackageReference "coreai-models" */;
+			productName = CoreAIDiffusion;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

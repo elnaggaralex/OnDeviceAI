@@ -138,6 +138,8 @@ struct ModelOptionCard: View {
     let model: AIModelOption
     let isSelected: Bool
     let isDownloaded: Bool
+    let downloadSize: Int64?
+    let isDownloadSizeUnavailable: Bool
     let isDownloading: Bool
     let downloadProgress: Double?
     let downloadError: String?
@@ -172,6 +174,15 @@ struct ModelOptionCard: View {
                         }
                         .foregroundStyle(Colors.muted)
 
+                        Label(
+                            downloadSize.map {
+                                "Download size: \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))"
+                            } ?? (isDownloadSizeUnavailable ? "Download size unavailable" : "Download size: checking…"),
+                            systemImage: "arrow.down.circle"
+                        )
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Colors.muted)
+
                         if let downloadError {
                             Label(downloadError, systemImage: "exclamationmark.triangle.fill")
                                 .font(.system(size: 11, weight: .medium))
@@ -188,21 +199,12 @@ struct ModelOptionCard: View {
                 downloadButton
                 if let huggingFaceURL {
                     Link(destination: huggingFaceURL) {
-                        ZStack(alignment: .topTrailing) {
-                            Text("🤗")
-                                .font(.system(size: 23))
-                                .frame(width: 30, height: 30)
-
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 15, height: 15)
-                                .background(Colors.blue, in: Circle())
-                                .overlay {
-                                    Circle().stroke(Colors.surface, lineWidth: 1.5)
-                                }
-                                .offset(x: 3, y: -3)
-                        }
+                        Image("ExternalLink")
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 30, height: 30)
+                            .foregroundStyle(Colors.blue)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open \(model.repositoryID) on Hugging Face")

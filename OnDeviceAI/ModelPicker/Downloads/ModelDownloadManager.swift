@@ -32,6 +32,18 @@ final class ModelDownloadManager {
         downloader.audio8ModelDirectoryURL(repositoryID: repositoryID)
     }
 
+    func glmOCRModelDirectories(repositoryID: String) -> (vision: URL, decoder: URL)? {
+        downloader.glmOCRModelDirectories(repositoryID: repositoryID)
+    }
+
+    func flux2IOSModelDirectoryURL(repositoryID: String) -> URL? {
+        downloader.flux2IOSModelDirectoryURL(repositoryID: repositoryID)
+    }
+
+    func downloadSize(repositoryID: String) async throws -> Int64 {
+        try await downloader.downloadSize(repositoryID: repositoryID)
+    }
+
     func download(for repositoryID: String) -> ModelDownloadStatus? {
         activeDownloads.first { $0.repositoryID == repositoryID }
     }

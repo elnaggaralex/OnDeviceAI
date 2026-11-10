@@ -27,9 +27,18 @@ final class HomeViewModel {
         homeUI.uiModel.customModelCategory == .audio
             && homeUI.uiModel.customModelTask.localizedCaseInsensitiveContains("text to speech")
     }
+    private var isGLMOCRModel: Bool {
+        homeUI.uiModel.customModelName.caseInsensitiveCompare(
+            "coreai-community/GLM-OCR-CoreAI"
+        ) == .orderedSame
+    }
+    private var isCoreAIImageGenerationModel: Bool {
+        CoreAIImageGenerationProvider.supports(repositoryID: homeUI.uiModel.customModelName)
+    }
     
     private let textProcessingProvider: TextProcessingProvider
-    private let audioToSpeechProvider = AudioToSpeechProvider()
+    private let textToSpeechProvider = TextToSpeechProvider()
+    private let coreAIImageGenerationProvider = CoreAIImageGenerationProvider()
     private let speechSynthesisProvider: SpeechSynthesisProvider
     private let imagePlaygroundProvider: ImagePlaygroundProvider
     let modelDownloadManager = ModelDownloadManager()
@@ -143,13 +152,60 @@ final class HomeViewModel {
             }
             var modelBundleURL: URL?
             var audio8ModelDirectoryURL: URL?
+            var diffusionModelDirectoryURL: URL?
+            var ocrImageURL: URL?
+            var ocrModelDirectories: (vision: URL, decoder: URL)?
             if case let .CoreAI(repositoryID) = agentMode {
-                guard modelDownloadManager.isDownloaded(repositoryID: repositoryID) else {
-                    isSelectedModelNotDownloadedAlertPresented = true
-                    return
+                if isCoreAIImageGenerationModel {
+                    guard modelDownloadManager.isDownloaded(repositoryID: repositoryID) else {
+                        isSelectedModelNotDownloadedAlertPresented = true
+                        return
+                    }
+                    guard let directory = modelDownloadManager.flux2IOSModelDirectoryURL(repositoryID: repositoryID) else {
+                        homeUI.uiModel.errorMessage = "The downloaded FLUX.2 repository is missing its iOS diffusion bundles or tokenizer. Download the model again, then retry."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    guard homeUI.uiModel.attachedFiles.isEmpty else {
+                        homeUI.uiModel.errorMessage = "FLUX.2 currently accepts text prompts only. Remove attachments before generating an image."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    diffusionModelDirectoryURL = directory
+                } else if isGLMOCRModel {
+                    let imageURLs = homeUI.uiModel.attachedFiles.filter {
+                        fileType(for: $0)?.conforms(to: .image) == true
+                    }
+                    let hasUnsupportedAttachments = homeUI.uiModel.attachedFiles.contains {
+                        fileType(for: $0)?.conforms(to: .audio) == true
+                            || fileType(for: $0)?.conforms(to: .text) == true
+                    }
+                    guard imageURLs.count == 1, !hasUnsupportedAttachments else {
+                        homeUI.uiModel.errorMessage = "GLM-OCR needs exactly one attached image. Remove any other attachments, then try again."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    guard modelDownloadManager.isDownloaded(repositoryID: repositoryID) else {
+                        isSelectedModelNotDownloadedAlertPresented = true
+                        return
+                    }
+                    guard let directories = modelDownloadManager.glmOCRModelDirectories(repositoryID: repositoryID) else {
+                        homeUI.uiModel.errorMessage = "The downloaded GLM-OCR repository is missing its compatible vision/decoder bundles or tokenizer. Download the model again, then retry."
+                        homeUI.viewState = .failed
+                        return
+                    }
+                    ocrModelDirectories = directories
+                    ocrImageURL = imageURLs[0]
+                } else {
+                    guard modelDownloadManager.isDownloaded(repositoryID: repositoryID) else {
+                        isSelectedModelNotDownloadedAlertPresented = true
+                        return
+                    }
                 }
-                if isTextToSpeechModel {
-                    guard AudioToSpeechProvider.supports(repositoryID: repositoryID) else {
+                if isGLMOCRModel {
+                    // The app loads the downloaded bundle pair using its exported 22×31 geometry.
+                } else if isTextToSpeechModel {
+                    guard TextToSpeechProvider.supports(repositoryID: repositoryID) else {
                         homeUI.uiModel.errorMessage = "This app currently supports Audio8-TTS for custom text-to-speech models."
                         homeUI.viewState = .failed
                         return
@@ -165,7 +221,7 @@ final class HomeViewModel {
                         return
                     }
                     audio8ModelDirectoryURL = modelDirectoryURL
-                } else {
+                } else if !isCoreAIImageGenerationModel {
                     guard homeUI.uiModel.customModelCategory == .text,
                           homeUI.uiModel.customModelTask.localizedCaseInsensitiveContains("generation") else {
                         homeUI.uiModel.errorMessage = "The selected model does not support a task available in this app. Choose a text-generation or supported text-to-speech model."
@@ -189,8 +245,10 @@ final class HomeViewModel {
                 }
             }
             homeUI.uiModel.structuredResponse = nil
+            homeUI.uiModel.plainTextResponse = nil
             homeUI.uiModel.errorMessage = nil
             homeUI.uiModel.consumedTokenCount = nil
+            homeUI.uiModel.isTokenCountEstimated = false
             homeUI.uiModel.speechText = nil
             homeUI.uiModel.speechStyle = nil
             homeUI.uiModel.speechGender = nil
@@ -210,8 +268,31 @@ final class HomeViewModel {
             startElapsedTimer(from: startTime)
             let prompt = homeUI.uiModel.prompt
             let attachedFiles = homeUI.uiModel.attachedFiles
+            if ocrImageURL != nil {
+                homeUI.uiModel.consumedTokenCount = 682 + max(1, (prompt.count + 3) / 4)
+                homeUI.uiModel.isTokenCountEstimated = true
+            } else if audio8ModelDirectoryURL == nil {
+                homeUI.uiModel.consumedTokenCount = max(1, (prompt.count + 3) / 4)
+                homeUI.uiModel.isTokenCountEstimated = true
+            }
             generationTask = Task {
-                if let audio8ModelDirectoryURL {
+                if let diffusionModelDirectoryURL {
+                    await generateCoreAIImage(
+                        prompt: prompt,
+                        modelDirectoryURL: diffusionModelDirectoryURL,
+                        startedAt: startTime,
+                        generationID: generationID
+                    )
+                } else if let ocrImageURL {
+                    if let ocrModelDirectories {
+                        await generateOCR(
+                            imageURL: ocrImageURL,
+                            modelDirectories: ocrModelDirectories,
+                            startedAt: startTime,
+                            generationID: generationID
+                        )
+                    }
+                } else if let audio8ModelDirectoryURL {
                     await generateSpeech(
                         text: prompt,
                         modelDirectoryURL: audio8ModelDirectoryURL,
@@ -227,6 +308,89 @@ final class HomeViewModel {
                         generationID: generationID
                     )
                 }
+            }
+        }
+    }
+
+    private func generateCoreAIImage(
+        prompt: String,
+        modelDirectoryURL: URL,
+        startedAt startTime: Date,
+        generationID: UUID
+    ) async {
+        defer {
+            if activeGenerationID == generationID {
+                activeGenerationID = nil
+                stopElapsedTimer()
+                generationTask = nil
+            }
+        }
+
+        do {
+            let imageURL = try await coreAIImageGenerationProvider.generate(
+                prompt: prompt.trimmingCharacters(in: .whitespacesAndNewlines),
+                modelDirectoryURL: modelDirectoryURL
+            )
+            try Task.checkCancellation()
+            guard activeGenerationID == generationID else { return }
+            homeUI.uiModel.generatedImageURL = imageURL
+            homeUI.uiModel.imageGenerationRequest = ImageGenerationRequest(
+                description: prompt,
+                style: .automatic
+            )
+            homeUI.uiModel.completionDuration = String(format: "%.1fs", Date().timeIntervalSince(startTime))
+            homeUI.viewState = .executed(homeUI.uiModel)
+        } catch is CancellationError {
+            if activeGenerationID == generationID {
+                homeUI.viewState = .executed(homeUI.uiModel)
+            }
+        } catch {
+            if activeGenerationID == generationID {
+                homeUI.uiModel.errorMessage = error.localizedDescription
+                homeUI.viewState = .failed
+            }
+        }
+    }
+
+    private func generateOCR(
+        imageURL: URL,
+        modelDirectories: (vision: URL, decoder: URL),
+        startedAt startTime: Date,
+        generationID: UUID
+    ) async {
+        defer {
+            if activeGenerationID == generationID {
+                activeGenerationID = nil
+                stopElapsedTimer()
+                generationTask = nil
+            }
+        }
+
+        let didStartAccessing = imageURL.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing { imageURL.stopAccessingSecurityScopedResource() }
+        }
+
+        do {
+            let text = try await GLMOCRProvider().recognize(
+                imageURL: imageURL,
+                visionDirectoryURL: modelDirectories.vision,
+                decoderDirectoryURL: modelDirectories.decoder
+            )
+            try Task.checkCancellation()
+            guard activeGenerationID == generationID else { return }
+            homeUI.uiModel.plainTextResponse = text
+            homeUI.uiModel.consumedTokenCount = 682 + max(1, (text.count + 3) / 4)
+            homeUI.uiModel.completionDuration = String(format: "%.1fs", Date().timeIntervalSince(startTime))
+            homeUI.viewState = .executed(homeUI.uiModel)
+        } catch is CancellationError {
+            if activeGenerationID == generationID {
+                homeUI.viewState = .executed(homeUI.uiModel)
+            }
+        } catch {
+            if activeGenerationID == generationID {
+                homeUI.uiModel.errorMessage = error.localizedDescription
+                homeUI.viewState = .failed
             }
         }
     }
@@ -354,7 +518,23 @@ final class HomeViewModel {
                 try Task.checkCancellation()
                 guard activeGenerationID == generationID else { return }
                 homeUI.uiModel.structuredResponse = snapshot.content
-                homeUI.uiModel.consumedTokenCount = snapshot.usage.totalTokenCount
+                let reportedTokenCount = snapshot.usage.totalTokenCount
+                if reportedTokenCount > 0 {
+                    homeUI.uiModel.consumedTokenCount = reportedTokenCount
+                    homeUI.uiModel.isTokenCountEstimated = false
+                } else {
+                    let generatedText = [
+                        snapshot.content.title ?? "",
+                        snapshot.content.response ?? "",
+                        snapshot.content.keyPoints?.joined(separator: " ") ?? "",
+                        snapshot.content.actionItems?.joined(separator: " ") ?? ""
+                    ].joined(separator: " ")
+                    homeUI.uiModel.consumedTokenCount = max(
+                        1,
+                        (prompt.count + generatedText.count + 3) / 4
+                    )
+                    homeUI.uiModel.isTokenCountEstimated = true
+                }
             }
 
             guard activeGenerationID == generationID else { return }
@@ -387,7 +567,7 @@ final class HomeViewModel {
         }
 
         do {
-            let samples = try await audioToSpeechProvider.synthesize(
+            let samples = try await textToSpeechProvider.synthesize(
                 text: text,
                 modelDirectoryURL: modelDirectoryURL
             )
@@ -395,7 +575,7 @@ final class HomeViewModel {
             guard activeGenerationID == generationID else { return }
             try speechSynthesisProvider.loadGeneratedAudio(
                 samples: samples,
-                sampleRate: AudioToSpeechProvider.sampleRate
+                sampleRate: TextToSpeechProvider.sampleRate
             )
             homeUI.uiModel.speechText = text
             homeUI.uiModel.isGeneratedAudioReady = true
@@ -462,8 +642,10 @@ struct UIModel {
     var customModelTask = "Text Generation"
     var completionDuration = "0s"
     var consumedTokenCount: Int?
+    var isTokenCountEstimated = false
     var errorMessage: String?
     var structuredResponse: TextTaskResult.PartiallyGenerated?
+    var plainTextResponse: String?
     var speechText: String?
     var isGeneratedAudioReady = false
     var speechStyle: RequestedSpeechStyle?

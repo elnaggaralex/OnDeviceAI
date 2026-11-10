@@ -62,6 +62,50 @@ struct HuggingFaceModelDownloader {
         return modelDirectory
     }
 
+    func glmOCRModelDirectories(repositoryID: String) -> (vision: URL, decoder: URL)? {
+        guard repositoryID.caseInsensitiveCompare("coreai-community/GLM-OCR-CoreAI") == .orderedSame,
+              isDownloaded(repositoryID: repositoryID) else {
+            return nil
+        }
+
+        let root = installedDirectory(repositoryID: repositoryID)
+        let visionDirectory = root.appendingPathComponent("vision", isDirectory: true)
+        let decoderDirectory = root.appendingPathComponent("decoder", isDirectory: true)
+        let tokenizerURL = decoderDirectory.appendingPathComponent("tokenizer/tokenizer.json")
+        guard hasModelBundle(in: visionDirectory),
+              hasModelBundle(in: decoderDirectory),
+              fileManager.fileExists(atPath: decoderDirectory.appendingPathComponent("metadata.json").path),
+              fileManager.fileExists(atPath: tokenizerURL.path) else {
+            return nil
+        }
+        return (visionDirectory, decoderDirectory)
+    }
+
+    func flux2IOSModelDirectoryURL(repositoryID: String) -> URL? {
+        guard repositoryID.caseInsensitiveCompare("grabbou/FLUX.2-klein-4B-CoreAI") == .orderedSame,
+              isDownloaded(repositoryID: repositoryID) else {
+            return nil
+        }
+
+        let directory = installedDirectory(repositoryID: repositoryID).appendingPathComponent("ios", isDirectory: true)
+        let metadataURL = directory.appendingPathComponent("metadata.json")
+        guard let data = try? Data(contentsOf: metadataURL),
+              let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              metadata["kind"] as? String == "diffusion",
+              let assets = metadata["assets"] as? [String: String],
+              assets["transformer_512"] != nil,
+              assets["text_encoder"] != nil,
+              assets["vae_decoder_half"] != nil else {
+            return nil
+        }
+        return directory
+    }
+
+    private func hasModelBundle(in directory: URL) -> Bool {
+        guard let files = try? fileManager.contentsOfDirectory(atPath: directory.path) else { return false }
+        return files.contains { $0.lowercased().hasSuffix(".aimodel") || $0.lowercased().hasSuffix(".aimodelc") }
+    }
+
     func installedRepositoryIDs() -> Set<String> {
         guard let directories = try? fileManager.contentsOfDirectory(
             at: storageRoot,
@@ -164,6 +208,12 @@ struct HuggingFaceModelDownloader {
         try fileManager.moveItem(at: stagingDirectory, to: installedDirectory)
     }
 
+    func downloadSize(repositoryID: String) async throws -> Int64 {
+        let metadata = try await fetchRepositoryMetadata(repositoryID: repositoryID)
+        let files = try selectedFiles(from: metadata.files, repositoryID: repositoryID)
+        return files.reduce(Int64.zero) { $0 + max(0, $1.size ?? 0) }
+    }
+
     private func fetchRepositoryMetadata(repositoryID: String) async throws -> HubRepositoryMetadata {
         let encodedID = repositoryID.split(separator: "/").map(String.init).map(encodePathComponent).joined(separator: "/")
         guard let url = URL(string: "https://huggingface.co/api/models/\(encodedID)?blobs=true") else {
@@ -194,24 +244,79 @@ struct HuggingFaceModelDownloader {
         from files: [HubRepositoryFile],
         repositoryID: String
     ) throws -> [HubRepositoryFile] {
-        guard repositoryID.caseInsensitiveCompare("coreai-community/Audio8-TTS-Preview-0.6b-CoreAI") == .orderedSame else {
-            return files
+        if repositoryID.caseInsensitiveCompare("coreai-community/Audio8-TTS-Preview-0.6b-CoreAI") == .orderedSame {
+            let requiredPaths = [
+                "audio8_dualar_int8_cl2048_w32.aimodel",
+                "audio8_codec_decoder_fp16_t160.aimodel",
+                "tokenizer"
+            ]
+            let containsPath = { (prefix: String) in
+                files.contains { $0.path == prefix || $0.path.hasPrefix(prefix + "/") }
+            }
+            guard requiredPaths.allSatisfy(containsPath) else {
+                throw ModelDownloadError.missingRequiredAssets
+            }
+            return files.filter { file in
+                requiredPaths.contains { file.path == $0 || file.path.hasPrefix($0 + "/") }
+            }
         }
 
-        let requiredPaths = [
-            "audio8_dualar_int8_cl2048_w32.aimodel",
-            "audio8_codec_decoder_fp16_t160.aimodel",
-            "tokenizer"
-        ]
-        let containsPath = { (prefix: String) in
-            files.contains { $0.path == prefix || $0.path.hasPrefix(prefix + "/") }
+        let iosDirectories = Set(files.compactMap { file -> String? in
+            guard let directory = platformDirectory(in: file.path), directory.isIOS else { return nil }
+            return directory.path
+        })
+        guard !iosDirectories.isEmpty else {
+            let hasMacOSDirectories = files.contains {
+                guard let directory = platformDirectory(in: $0.path) else { return false }
+                return !directory.isIOS
+            }
+            return hasMacOSDirectories
+                ? files.filter { platformDirectory(in: $0.path).map(\.isIOS) == nil }
+                : files
         }
-        guard requiredPaths.allSatisfy(containsPath) else {
-            throw ModelDownloadError.missingRequiredAssets
+
+        let genericIOSDirectories = iosDirectories.filter {
+            URL(fileURLWithPath: $0).lastPathComponent.caseInsensitiveCompare("ios") == .orderedSame
         }
+        let selectedIOSDirectories = genericIOSDirectories.isEmpty ? iosDirectories : genericIOSDirectories
+        let supportedSharedDirectories: Set<String> = ["tokenizer", "glue", "host", "assets"]
+        let supportedRootExtensions: Set<String> = ["json", "md", "txt", "license"]
+
         return files.filter { file in
-            requiredPaths.contains { file.path == $0 || file.path.hasPrefix($0 + "/") }
+            if selectedIOSDirectories.contains(where: { file.path == $0 || file.path.hasPrefix($0 + "/") }) {
+                return true
+            }
+            if platformDirectory(in: file.path) != nil { return false }
+
+            let components = file.path.split(separator: "/").map(String.init)
+            if let first = components.first?.lowercased(), supportedSharedDirectories.contains(first) {
+                return true
+            }
+            guard components.count == 1 else { return false }
+            let filename = components[0].lowercased()
+            if ["tokenizer", "vocab", "merges", "special_tokens", "added_tokens"].contains(where: {
+                filename.hasPrefix($0)
+            }) {
+                return true
+            }
+            return supportedRootExtensions.contains(URL(fileURLWithPath: filename).pathExtension)
         }
+
+    }
+
+    private func platformDirectory(in path: String) -> (path: String, isIOS: Bool)? {
+        let components = path.split(separator: "/").map(String.init)
+        for (index, component) in components.enumerated() {
+            let value = component.lowercased()
+            let isIOS = value == "ios" || value.hasPrefix("ios-") || value.hasPrefix("ios_")
+                || value == "iphone" || value.hasPrefix("iphone-") || value.hasPrefix("iphone_")
+            let isMacOS = value == "macos" || value.hasPrefix("macos-") || value.hasPrefix("macos_")
+                || value == "mac" || value.hasPrefix("mac-") || value.hasPrefix("mac_")
+            if isIOS || isMacOS {
+                return (components.prefix(index + 1).joined(separator: "/"), isIOS)
+            }
+        }
+        return nil
     }
 
     private func fileURL(repositoryID: String, revision: String, filename: String) throws -> URL {

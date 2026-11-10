@@ -56,6 +56,7 @@ struct HomeView: View {
                         prompt: promptBinding,
                         attachedFiles: attachedFilesBinding,
                         consumedTokenCount: viewModel.uiModel.consumedTokenCount,
+                        isTokenCountEstimated: viewModel.uiModel.isTokenCountEstimated,
                         isTextToSpeech: viewModel.uiModel.selectedMode != 0 && viewModel.isTextToSpeechModel
                     )
                     RunAgentButton(isRunning: isExecuting) {
