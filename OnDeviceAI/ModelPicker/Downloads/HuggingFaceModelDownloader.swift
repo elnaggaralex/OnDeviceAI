@@ -1,5 +1,12 @@
 import Foundation
 
+private enum MiniCPMV46BundleVariant {
+    static let all: [(decoder: String, vision: String)] = [
+        ("gpu-pipelined/minicpmv46_vlm_decode_int8hu", "gpu-pipelined/minicpmv46_vision_int8lin"),
+        ("gpu-pipelined/minicpmv46_vlm_decode_int8lin", "gpu-pipelined/minicpmv46_vision")
+    ]
+}
+
 struct HuggingFaceModelDownloader {
     private let session: URLSession
     private let fileDownloader: ModelFileDownloadSession
@@ -107,16 +114,15 @@ struct HuggingFaceModelDownloader {
               isDownloaded(repositoryID: repositoryID) else { return nil }
 
         let root = installedDirectory(repositoryID: repositoryID)
-        let decoder = root.appendingPathComponent(
-            "gpu-pipelined/minicpmv46_vlm_decode_int8lin", isDirectory: true)
-        let vision = root.appendingPathComponent(
-            "gpu-pipelined/minicpmv46_vision", isDirectory: true)
-        let tokenizer = decoder.appendingPathComponent("tokenizer/tokenizer.json")
-        guard hasModelBundle(in: decoder), hasModelBundle(in: vision),
-              fileManager.fileExists(atPath: tokenizer.path) else {
-            return nil
+        for variant in MiniCPMV46BundleVariant.all {
+            let decoder = root.appendingPathComponent(variant.decoder, isDirectory: true)
+            let vision = root.appendingPathComponent(variant.vision, isDirectory: true)
+            let tokenizer = decoder.appendingPathComponent("tokenizer/tokenizer.json")
+            guard hasModelBundle(in: decoder), hasModelBundle(in: vision),
+                  fileManager.fileExists(atPath: tokenizer.path) else { continue }
+            return VisionLanguageModelDirectories(vision: vision, decoder: decoder)
         }
-        return VisionLanguageModelDirectories(vision: vision, decoder: decoder)
+        return nil
     }
 
     func speechRecognitionBundleURL(repositoryID: String) -> URL? {
@@ -352,20 +358,17 @@ struct HuggingFaceModelDownloader {
         repositoryID: String
     ) throws -> [HubRepositoryFile] {
         if VisionLanguageAdapter.adapter(for: repositoryID) == .miniCPMV46 {
-            // Pair the int8lin decoder with its matching fp16 vision tower, as in
-            // CoreAIKit's MiniCPM-V 4.6 preset. Avoid downloading the repo's alternate
-            // int8 decoder/vision exports, which this adapter does not load.
-            let requiredPrefixes = [
-                "gpu-pipelined/minicpmv46_vlm_decode_int8lin",
-                "gpu-pipelined/minicpmv46_vision"
-            ]
-            guard requiredPrefixes.allSatisfy({ prefix in
-                files.contains { $0.path == prefix || $0.path.hasPrefix(prefix + "/") }
+            // Prefer the bundle pair currently recommended by the model publisher,
+            // while retaining the CoreAIKit preset pair for older repository revisions.
+            guard let selectedVariant = MiniCPMV46BundleVariant.all.first(where: { variant in
+                [variant.decoder, variant.vision].allSatisfy { prefix in
+                    files.contains { $0.path == prefix || $0.path.hasPrefix(prefix + "/") }
+                }
             }) else {
                 throw ModelDownloadError.missingRequiredAssets
             }
             return files.filter { file in
-                requiredPrefixes.contains { prefix in
+                [selectedVariant.decoder, selectedVariant.vision].contains { prefix in
                     file.path == prefix || file.path.hasPrefix(prefix + "/")
                 }
             }

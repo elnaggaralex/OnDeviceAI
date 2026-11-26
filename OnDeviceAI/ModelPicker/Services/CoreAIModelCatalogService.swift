@@ -124,6 +124,9 @@ struct CoreAIModelCatalogService {
         if modelKey == canonicalModelKey(for: "mlboydaisuke/GLM-OCR-CoreAI") {
             return repositoryID.caseInsensitiveCompare("mlboydaisuke/GLM-OCR-CoreAI") == .orderedSame ? 0 : 1
         }
+        if modelKey == canonicalModelKey(for: "mlboydaisuke/MiniCPM-V-4.6-CoreAI") {
+            return repositoryID.caseInsensitiveCompare("mlboydaisuke/MiniCPM-V-4.6-CoreAI") == .orderedSame ? 0 : 1
+        }
         return repositoryID.lowercased().hasPrefix("coreai-community/") ? 0 : 1
     }
 

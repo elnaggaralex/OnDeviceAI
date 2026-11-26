@@ -23,8 +23,8 @@ struct MiniCPMV46Provider {
         )
         let session = LanguageModelSession(model: model)
         let response = try await session.respond(to: Prompt {
-            Attachment(image)
             prompt
+            Attachment(image)
         })
         return response.content
     }
