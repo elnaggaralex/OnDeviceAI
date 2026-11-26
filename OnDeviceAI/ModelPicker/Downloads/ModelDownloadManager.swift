@@ -10,6 +10,9 @@ final class ModelDownloadManager {
 
     private let downloader: HuggingFaceModelDownloader
     private var tasks: [String: Task<Void, Never>] = [:]
+    #if DEBUG
+    private var lastPilotProgressByRepositoryID: [String: Int] = [:]
+    #endif
 
     init() {
         let downloader = HuggingFaceModelDownloader()
@@ -32,8 +35,24 @@ final class ModelDownloadManager {
         downloader.audio8ModelDirectoryURL(repositoryID: repositoryID)
     }
 
-    func glmOCRModelDirectories(repositoryID: String) -> (vision: URL, decoder: URL)? {
-        downloader.glmOCRModelDirectories(repositoryID: repositoryID)
+    func imageToTextModelDirectories(repositoryID: String) -> ImageToTextModelDirectories? {
+        downloader.imageToTextModelDirectories(repositoryID: repositoryID)
+    }
+
+    func miniCPMV46ModelDirectories(repositoryID: String) -> VisionLanguageModelDirectories? {
+        downloader.miniCPMV46ModelDirectories(repositoryID: repositoryID)
+    }
+
+    func speechRecognitionBundleURL(repositoryID: String) -> URL? {
+        downloader.speechRecognitionBundleURL(repositoryID: repositoryID)
+    }
+
+    func objectDetectionModelURL(repositoryID: String) -> URL? {
+        downloader.objectDetectionModelURL(repositoryID: repositoryID)
+    }
+
+    func imageSegmentationBundleURL(repositoryID: String) -> URL? {
+        downloader.imageSegmentationBundleURL(repositoryID: repositoryID)
     }
 
     func flux2IOSModelDirectoryURL(repositoryID: String) -> URL? {
@@ -73,6 +92,26 @@ final class ModelDownloadManager {
             await self?.performDownload(repositoryID: repositoryID, displayName: displayName)
         }
     }
+
+    #if DEBUG
+    func downloadForPilot(repositoryID: String, displayName: String) async throws {
+        guard !isDownloaded(repositoryID: repositoryID) else { return }
+        print("PILOT DOWNLOAD START \(repositoryID)")
+        try await downloader.download(repositoryID: repositoryID, displayName: displayName) { progress in
+            guard let progress else { return }
+            let percent = Int(progress * 100)
+            guard percent >= 10, percent.isMultiple(of: 10),
+                  self.lastPilotProgressByRepositoryID[repositoryID] != percent else { return }
+            self.lastPilotProgressByRepositoryID[repositoryID] = percent
+            if percent.isMultiple(of: 10) {
+                print("PILOT DOWNLOAD \(repositoryID) \(percent)%")
+            }
+        }
+        lastPilotProgressByRepositoryID[repositoryID] = nil
+        downloadedRepositoryIDs.insert(repositoryID)
+        print("PILOT DOWNLOAD COMPLETE \(repositoryID)")
+    }
+    #endif
 
     private func performDownload(repositoryID: String, displayName: String) async {
         do {

@@ -10,6 +10,9 @@
 		A10000000000000000000001 /* CoreAILM in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000003 /* CoreAILM */; };
 		A10000000000000000000006 /* CoreAIKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000005 /* CoreAIKit */; };
 		A10000000000000000000007 /* CoreAIDiffusion in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000008 /* CoreAIDiffusion */; };
+		A10000000000000000000009 /* CoreAISpeech in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000010 /* CoreAISpeech */; };
+		A10000000000000000000011 /* CoreAIObjectDetection in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000012 /* CoreAIObjectDetection */; };
+		A10000000000000000000013 /* CoreAISegmentation in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000014 /* CoreAISegmentation */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +34,9 @@
 				A10000000000000000000001 /* CoreAILM in Frameworks */,
 				A10000000000000000000006 /* CoreAIKit in Frameworks */,
 				A10000000000000000000007 /* CoreAIDiffusion in Frameworks */,
+				A10000000000000000000009 /* CoreAISpeech in Frameworks */,
+				A10000000000000000000011 /* CoreAIObjectDetection in Frameworks */,
+				A10000000000000000000013 /* CoreAISegmentation in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -73,6 +79,9 @@
 				A10000000000000000000003 /* CoreAILM */,
 				A10000000000000000000005 /* CoreAIKit */,
 				A10000000000000000000008 /* CoreAIDiffusion */,
+				A10000000000000000000010 /* CoreAISpeech */,
+				A10000000000000000000012 /* CoreAIObjectDetection */,
+				A10000000000000000000014 /* CoreAISegmentation */,
 			);
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* OnDeviceAI.app */;
@@ -398,6 +407,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000002 /* XCRemoteSwiftPackageReference "coreai-models" */;
 			productName = CoreAIDiffusion;
+		};
+		A10000000000000000000010 /* CoreAISpeech */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000002 /* XCRemoteSwiftPackageReference "coreai-models" */;
+			productName = CoreAISpeech;
+		};
+		A10000000000000000000012 /* CoreAIObjectDetection */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000002 /* XCRemoteSwiftPackageReference "coreai-models" */;
+			productName = CoreAIObjectDetection;
+		};
+		A10000000000000000000014 /* CoreAISegmentation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000002 /* XCRemoteSwiftPackageReference "coreai-models" */;
+			productName = CoreAISegmentation;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

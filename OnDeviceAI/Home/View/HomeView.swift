@@ -57,7 +57,8 @@ struct HomeView: View {
                         attachedFiles: attachedFilesBinding,
                         consumedTokenCount: viewModel.uiModel.consumedTokenCount,
                         isTokenCountEstimated: viewModel.uiModel.isTokenCountEstimated,
-                        isTextToSpeech: viewModel.uiModel.selectedMode != 0 && viewModel.isTextToSpeechModel
+                        isTextToSpeech: viewModel.uiModel.selectedMode != 0
+                            && viewModel.uiModel.executionCapability == .textToSpeech
                     )
                     RunAgentButton(isRunning: isExecuting) {
                         viewModel.toggleExecutionState()
@@ -97,6 +98,13 @@ struct HomeView: View {
         )
         .task {
             viewModel.checkAppleIntelligenceAvailability()
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--coreai-model-pilot")
+                || ProcessInfo.processInfo.arguments.contains("--coreai-model-pilot-rfdetr")
+                || ProcessInfo.processInfo.arguments.contains("--coreai-model-pilot-glm-ocr") {
+                await CoreAIModelPilot.run(using: viewModel)
+            }
+            #endif
         }
         .alert("Enable Apple Intelligence", isPresented: $viewModel.isAppleIntelligenceEnableAlertPresented) {
             Button("OK") {

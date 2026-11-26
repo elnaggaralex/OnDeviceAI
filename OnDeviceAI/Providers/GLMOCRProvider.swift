@@ -58,11 +58,21 @@ struct GLMOCRProvider {
     }
 
     private func validateCoreAIProducerMetadata(in bundleURL: URL) throws {
-        let metadataURL = bundleURL.appendingPathComponent("metadata.json")
-        guard let data = try? Data(contentsOf: metadataURL),
-              let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let producer = metadata["producer"] as? String,
-              !producer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let fileManager = FileManager.default
+        let modelDirectories = (try? fileManager.contentsOfDirectory(
+            at: bundleURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ))?.filter { $0.pathExtension.lowercased() == "aimodel" } ?? []
+        let metadataURLs = [bundleURL.appendingPathComponent("metadata.json")]
+            + modelDirectories.map { $0.appendingPathComponent("metadata.json") }
+        let hasProducerMetadata = metadataURLs.contains { metadataURL in
+            guard let data = try? Data(contentsOf: metadataURL),
+                  let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let producer = metadata["producer"] as? String else { return false }
+            return !producer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard hasProducerMetadata else {
             throw GLMOCRProviderError.incompatibleBundle
         }
     }

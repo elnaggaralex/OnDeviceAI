@@ -22,25 +22,33 @@ struct HuggingFaceModelDownloader {
 
     func languageModelBundleURL(repositoryID: String) -> URL? {
         guard isDownloaded(repositoryID: repositoryID),
-              let manifest = try? readManifest(repositoryID: repositoryID),
-              let modelPath = manifest.files.first(where: { $0.lowercased().hasSuffix(".aimodel") }) else {
-            return nil
-        }
+              let manifest = try? readManifest(repositoryID: repositoryID) else { return nil }
 
-        let modelURL = installedDirectory(repositoryID: repositoryID).appending(path: modelPath)
-        let bundleURL = modelURL.deletingLastPathComponent()
-        var isDirectory: ObjCBool = false
-        let hasTokenizer = fileManager.fileExists(
-            atPath: bundleURL.appendingPathComponent("tokenizer", isDirectory: true).path,
-            isDirectory: &isDirectory
-        ) && isDirectory.boolValue
+        let root = installedDirectory(repositoryID: repositoryID)
+        // HF exposes `.aimodel` bundles as directories containing `main.mlirb` and
+        // `main.hash`; therefore the manifest contains their contents, not a `.aimodel` path.
+        for metadataPath in manifest.files where URL(fileURLWithPath: metadataPath).lastPathComponent == "metadata.json" {
+            let metadataURL = root.appending(path: metadataPath)
+            guard let data = try? Data(contentsOf: metadataURL),
+                  let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let kind = metadata["kind"] as? String, kind.lowercased().contains("llm"),
+                  let assets = metadata["assets"] as? [String: Any],
+                  let mainPath = assets["main"] as? String,
+                  isSafeRelativePath(mainPath) else { continue }
 
-        guard fileManager.fileExists(atPath: modelURL.path),
-              fileManager.fileExists(atPath: bundleURL.appendingPathComponent("metadata.json").path),
-              hasTokenizer else {
-            return nil
+            let bundleURL = metadataURL.deletingLastPathComponent()
+            let modelURL = bundleURL.appending(path: mainPath)
+            let parentPath = (metadataPath as NSString).deletingLastPathComponent
+            let modelRelativePath = parentPath.isEmpty ? mainPath : parentPath + "/" + mainPath
+            let hasModelFiles = manifest.files.contains { $0.hasPrefix(modelRelativePath + "/") }
+            var isTokenizerDirectory: ObjCBool = false
+            let tokenizerURL = bundleURL.appendingPathComponent("tokenizer", isDirectory: true)
+            let hasTokenizer = fileManager.fileExists(atPath: tokenizerURL.path, isDirectory: &isTokenizerDirectory)
+                && isTokenizerDirectory.boolValue
+            guard hasModelFiles, fileManager.fileExists(atPath: modelURL.path), hasTokenizer else { continue }
+            return bundleURL
         }
-        return bundleURL
+        return nil
     }
 
     func audio8ModelDirectoryURL(repositoryID: String) -> URL? {
@@ -62,15 +70,28 @@ struct HuggingFaceModelDownloader {
         return modelDirectory
     }
 
-    func glmOCRModelDirectories(repositoryID: String) -> (vision: URL, decoder: URL)? {
-        guard repositoryID.caseInsensitiveCompare("coreai-community/GLM-OCR-CoreAI") == .orderedSame,
-              isDownloaded(repositoryID: repositoryID) else {
-            return nil
-        }
+    func imageToTextModelDirectories(repositoryID: String) -> ImageToTextModelDirectories? {
+        guard isDownloaded(repositoryID: repositoryID) else { return nil }
 
         let root = installedDirectory(repositoryID: repositoryID)
         let visionDirectory = root.appendingPathComponent("vision", isDirectory: true)
         let decoderDirectory = root.appendingPathComponent("decoder", isDirectory: true)
+        if repositoryID.caseInsensitiveCompare("coreai-community/Unlimited-OCR-CoreAI") == .orderedSame {
+            let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+            let tokenizerDirectory = root.appendingPathComponent("tokenizer", isDirectory: true)
+            let requiredAssets = ["embed_tokens.f16", "image_newline.f16", "view_seperator.f16", "prompt_input_ids.i32"]
+            guard hasModelBundle(in: visionDirectory), hasModelBundle(in: decoderDirectory),
+                  requiredAssets.allSatisfy({ fileManager.fileExists(atPath: assetsDirectory.appendingPathComponent($0).path) }),
+                  fileManager.fileExists(atPath: tokenizerDirectory.appendingPathComponent("tokenizer.json").path) else {
+                return nil
+            }
+            return ImageToTextModelDirectories(
+                vision: visionDirectory,
+                decoder: decoderDirectory,
+                assets: assetsDirectory,
+                tokenizer: tokenizerDirectory
+            )
+        }
         let tokenizerURL = decoderDirectory.appendingPathComponent("tokenizer/tokenizer.json")
         guard hasModelBundle(in: visionDirectory),
               hasModelBundle(in: decoderDirectory),
@@ -78,7 +99,93 @@ struct HuggingFaceModelDownloader {
               fileManager.fileExists(atPath: tokenizerURL.path) else {
             return nil
         }
-        return (visionDirectory, decoderDirectory)
+        return ImageToTextModelDirectories(vision: visionDirectory, decoder: decoderDirectory)
+    }
+
+    func miniCPMV46ModelDirectories(repositoryID: String) -> VisionLanguageModelDirectories? {
+        guard VisionLanguageAdapter.adapter(for: repositoryID) == .miniCPMV46,
+              isDownloaded(repositoryID: repositoryID) else { return nil }
+
+        let root = installedDirectory(repositoryID: repositoryID)
+        let decoder = root.appendingPathComponent(
+            "gpu-pipelined/minicpmv46_vlm_decode_int8lin", isDirectory: true)
+        let vision = root.appendingPathComponent(
+            "gpu-pipelined/minicpmv46_vision", isDirectory: true)
+        let tokenizer = decoder.appendingPathComponent("tokenizer/tokenizer.json")
+        guard hasModelBundle(in: decoder), hasModelBundle(in: vision),
+              fileManager.fileExists(atPath: tokenizer.path) else {
+            return nil
+        }
+        return VisionLanguageModelDirectories(vision: vision, decoder: decoder)
+    }
+
+    func speechRecognitionBundleURL(repositoryID: String) -> URL? {
+        guard isDownloaded(repositoryID: repositoryID), let manifest = try? readManifest(repositoryID: repositoryID) else {
+            return nil
+        }
+        let root = installedDirectory(repositoryID: repositoryID)
+        if repositoryID.caseInsensitiveCompare("coreai-community/Parakeet-TDT-0.6B-CoreAI") == .orderedSame {
+            let requiredPrefixes = ["parakeet_encoder", "parakeet_predict", "parakeet_joint"]
+            let hasGraphs = requiredPrefixes.allSatisfy { prefix in
+                manifest.files.contains {
+                    $0.lowercased().contains(prefix)
+                        && ($0.hasSuffix("main.mlirb") || $0.hasSuffix(".aimodel") || $0.hasSuffix(".aimodelc"))
+                }
+            }
+            guard hasGraphs,
+                  manifest.files.contains(where: { URL(fileURLWithPath: $0).lastPathComponent == "tokenizer.json" }) else {
+                return nil
+            }
+            return root
+        }
+        let metadataURLs = manifest.files
+            .filter { URL(fileURLWithPath: $0).lastPathComponent == "metadata.json" }
+            .map { root.appending(path: $0) }
+        for metadataURL in metadataURLs {
+            guard let data = try? Data(contentsOf: metadataURL),
+                  let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+            let kind = (metadata["kind"] as? String ?? "").lowercased()
+            if kind.contains("speech") || kind.contains("parakeet") || kind.contains("whisper") {
+                return metadataURL.deletingLastPathComponent()
+            }
+        }
+        return nil
+    }
+
+    func objectDetectionModelURL(repositoryID: String) -> URL? {
+        guard isDownloaded(repositoryID: repositoryID), let manifest = try? readManifest(repositoryID: repositoryID) else {
+            return nil
+        }
+        let root = installedDirectory(repositoryID: repositoryID)
+        let modelDirectories = Set(manifest.files.compactMap { path -> String? in
+            guard path.lowercased().hasSuffix("/main.mlirb") || path.lowercased().hasSuffix("/main.hash") else {
+                return nil
+            }
+            let graphDirectory = (path as NSString).deletingLastPathComponent
+            guard graphDirectory.lowercased().hasSuffix(".aimodel") else { return nil }
+            return graphDirectory
+        })
+        let preferredModel = modelDirectories.sorted {
+            let lhsIsNano = $0.lowercased().contains("nano")
+            let rhsIsNano = $1.lowercased().contains("nano")
+            return lhsIsNano == rhsIsNano ? $0 < $1 : lhsIsNano
+        }.first
+        return preferredModel.map { root.appending(path: $0) }
+    }
+
+    func imageSegmentationBundleURL(repositoryID: String) -> URL? {
+        guard isDownloaded(repositoryID: repositoryID), let manifest = try? readManifest(repositoryID: repositoryID) else {
+            return nil
+        }
+        let root = installedDirectory(repositoryID: repositoryID)
+        for relativePath in manifest.files where URL(fileURLWithPath: relativePath).lastPathComponent == "metadata.json" {
+            let metadataURL = root.appending(path: relativePath)
+            guard let data = try? Data(contentsOf: metadataURL),
+                  let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  metadata["kind"] as? String == "segmenter" else { continue }
+            return metadataURL.deletingLastPathComponent()
+        }
+        return nil
     }
 
     func flux2IOSModelDirectoryURL(repositoryID: String) -> URL? {
@@ -244,6 +351,26 @@ struct HuggingFaceModelDownloader {
         from files: [HubRepositoryFile],
         repositoryID: String
     ) throws -> [HubRepositoryFile] {
+        if VisionLanguageAdapter.adapter(for: repositoryID) == .miniCPMV46 {
+            // Pair the int8lin decoder with its matching fp16 vision tower, as in
+            // CoreAIKit's MiniCPM-V 4.6 preset. Avoid downloading the repo's alternate
+            // int8 decoder/vision exports, which this adapter does not load.
+            let requiredPrefixes = [
+                "gpu-pipelined/minicpmv46_vlm_decode_int8lin",
+                "gpu-pipelined/minicpmv46_vision"
+            ]
+            guard requiredPrefixes.allSatisfy({ prefix in
+                files.contains { $0.path == prefix || $0.path.hasPrefix(prefix + "/") }
+            }) else {
+                throw ModelDownloadError.missingRequiredAssets
+            }
+            return files.filter { file in
+                requiredPrefixes.contains { prefix in
+                    file.path == prefix || file.path.hasPrefix(prefix + "/")
+                }
+            }
+        }
+
         if repositoryID.caseInsensitiveCompare("coreai-community/Audio8-TTS-Preview-0.6b-CoreAI") == .orderedSame {
             let requiredPaths = [
                 "audio8_dualar_int8_cl2048_w32.aimodel",
@@ -369,6 +496,25 @@ struct HuggingFaceModelDownloader {
     private func directoryName(for repositoryID: String) -> String {
         repositoryID.replacingOccurrences(of: "/", with: "--")
     }
+}
+
+struct ImageToTextModelDirectories {
+    let vision: URL
+    let decoder: URL
+    let assets: URL?
+    let tokenizer: URL?
+
+    init(vision: URL, decoder: URL, assets: URL? = nil, tokenizer: URL? = nil) {
+        self.vision = vision
+        self.decoder = decoder
+        self.assets = assets
+        self.tokenizer = tokenizer
+    }
+}
+
+struct VisionLanguageModelDirectories {
+    let vision: URL
+    let decoder: URL
 }
 
 private struct HubRepositoryAPIResponse: Decodable {

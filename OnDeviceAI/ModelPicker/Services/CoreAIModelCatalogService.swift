@@ -52,7 +52,7 @@ struct CoreAIModelCatalogService {
                 uniqueByModel[key] = model
                 continue
             }
-            if repositoryPriority(model.id) < repositoryPriority(current.id) {
+            if repositoryPriority(model.id, for: key) < repositoryPriority(current.id, for: key) {
                 uniqueByModel[key] = model
             }
         }
@@ -90,7 +90,12 @@ struct CoreAIModelCatalogService {
             let tag = $0.lowercased()
             return tag == "ios" || tag.hasPrefix("ios-")
         }) == true
-        return hasRootBundle && hasIOSTag
+        let hasCoreAITag = model.tags?.contains(where: {
+            $0.caseInsensitiveCompare("coreai") == .orderedSame
+                || $0.caseInsensitiveCompare("core-ai") == .orderedSame
+                || $0.caseInsensitiveCompare("coreai-aimodel") == .orderedSame
+        }) == true
+        return hasRootBundle && (hasIOSTag || hasCoreAITag)
     }
 
     private func isIOSDirectoryName(_ component: Substring) -> Bool {
@@ -112,8 +117,14 @@ struct CoreAIModelCatalogService {
         return String(name.filter { $0.isLetter || $0.isNumber })
     }
 
-    private func repositoryPriority(_ repositoryID: String) -> Int {
-        repositoryID.lowercased().hasPrefix("coreai-community/") ? 0 : 1
+    private func repositoryPriority(_ repositoryID: String, for modelKey: String) -> Int {
+        // The community copy is a mirror and can lag the canonical GLM-OCR export.
+        // Prefer the canonical repo for this model while retaining the normal
+        // Core AI Community preference for other duplicate model names.
+        if modelKey == canonicalModelKey(for: "mlboydaisuke/GLM-OCR-CoreAI") {
+            return repositoryID.caseInsensitiveCompare("mlboydaisuke/GLM-OCR-CoreAI") == .orderedSame ? 0 : 1
+        }
+        return repositoryID.lowercased().hasPrefix("coreai-community/") ? 0 : 1
     }
 
     private func makeModelOption(from model: HubModelSummary) -> AIModelOption {
